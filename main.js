@@ -1,5 +1,7 @@
+
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
+const db = require('./db');
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -23,7 +25,13 @@ function createWindow() {
   ipcMain.on('close', () => {
     win.close();
   });
+
+  ipcMain.handle('get-todos', () => {
+    const rows = db.prepare('SELECT * FROM todos ORDER BY id').all();
+    return rows;
+  });
 }
+
 
 app.whenReady().then(() => {
   createWindow();
