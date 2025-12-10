@@ -39,22 +39,33 @@ function setupMailIpc(main) {
       const config = getImapConfig(info);
       try {
         const conn = await Imap.connect(config);
-        // INBOX에서 최근 10개 메일 불러오기
+        // INBOX에서 메일 불러오기 (mailSince 있으면 해당 날짜 이후)
         const box = await conn.openBox('INBOX');
-        const searchCriteria = ['ALL'];
+        let searchCriteria = ['ALL'];
+        if (info.mailSince) {
+          // IMAP에서 SINCE DD-MMM-YYYY 형식 필요 (예: 10-Dec-2025)
+          const dateObj = new Date(info.mailSince);
+          const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+          const day = dateObj.getDate();
+          const month = months[dateObj.getMonth()];
+          const year = dateObj.getFullYear();
+          const sinceStr = `${day}-${month}-${year}`;
+          searchCriteria = ['ALL', ['SINCE', sinceStr]];
+        }
         const fetchOptions = {
           bodies: ['HEADER.FIELDS (FROM TO SUBJECT DATE)', 'TEXT'],
           struct: true,
           markSeen: false
         };
         const messages = await conn.search(searchCriteria, fetchOptions);
-        // 최근 10개만
-        const recentMessages = messages.slice(-10);
-        const insert = db.prepare('INSERT INTO emails (received_at, subject, body, from_addr, todo_flag) VALUES (?, ?, ?, ?, ?)');
+        // 최근 10개 제한 제거: 조건에 맞는 모든 메일 저장
+        const insert = db.prepare('INSERT INTO emails (received_at, subject, body, from_addr, todo_flag, unique_hash) VALUES (?, ?, ?, ?, ?, ?)');
+        const exists = db.prepare('SELECT COUNT(*) as cnt FROM emails WHERE unique_hash = ?');
         const TODO_KEYWORDS = [
           '할일', '제출', '마감', '기한', '검토', '확인', '필수', '요청', '과제', '숙제', 'deadline', 'due', 'todo', 'assignment', 'report'
         ];
-        for (const m of recentMessages) {
+        const crypto = require('crypto');
+        for (const m of messages) {
           const header = m.parts.find(p => p.which.startsWith('HEADER'));
           const bodyPart = m.parts.find(p => p.which === 'TEXT');
           const subject = header && header.body.subject ? header.body.subject[0] : '';
@@ -63,7 +74,10 @@ function setupMailIpc(main) {
           const body = bodyPart ? bodyPart.body : '';
           const text = (subject + ' ' + (body || '')).toLowerCase();
           const todoFlag = TODO_KEYWORDS.some(k => text.includes(k)) ? 1 : 0;
-          insert.run(date, subject, body, from, todoFlag);
+          const hash = crypto.createHash('sha256').update(date + subject).digest('hex');
+          if (exists.get(hash).cnt === 0) {
+            insert.run(date, subject, body, from, todoFlag, hash);
+          }
         }
         await conn.end();
         return { success: true, message: '연동완료!' };

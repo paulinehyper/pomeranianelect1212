@@ -42,6 +42,10 @@
         <input type="password" id="mailPw" required class="short-input" />
       </div>
       <div class="form-row">
+        <label>수신날짜(이후 메일만)</label>
+        <input type="date" id="mailSince" class="short-input" style="width:160px;" />
+      </div>
+      <div class="form-row">
         <button type="submit" class="connect-btn">연동하기</button>
         <button type="button" id="viewEmailsBtn" class="connect-btn" style="margin-left:12px;opacity:0.5;pointer-events:none;">메일보기</button>
       </div>
@@ -51,6 +55,18 @@
     const form = document.getElementById('mailForm');
     const syncStatus = document.getElementById('syncStatusModal');
     const viewEmailsBtn = document.getElementById('viewEmailsBtn');
+
+    // 앱 실행 시 mail_settings 정보 불러와 입력란 자동 채움
+    window.electronAPI.getMailSettings().then(settings => {
+      if (settings) {
+        document.getElementById('mailType').value = settings.mail_type || 'naver';
+        document.getElementById('protocol').value = settings.protocol || 'imap-ssl';
+        document.getElementById('mailId').value = settings.mail_id || '';
+        document.getElementById('mailPw').value = settings.mail_pw || '';
+        document.getElementById('mailSince').value = settings.mail_since || '';
+      }
+    });
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       syncStatus.textContent = '연동 중...';
@@ -59,8 +75,11 @@
       const protocol = document.getElementById('protocol').value;
       const mailId = document.getElementById('mailId').value;
       const mailPw = document.getElementById('mailPw').value;
+      const mailSince = document.getElementById('mailSince').value;
+      // DB에 연동정보 저장
+      await window.electronAPI.saveMailSettings({ mailType, protocol, mailId, mailPw, mailSince });
       try {
-        const result = await window.electronAPI.mailConnect({ mailType, protocol, mailId, mailPw });
+        const result = await window.electronAPI.mailConnect({ mailType, protocol, mailId, mailPw, mailSince });
         syncStatus.textContent = result.message;
         syncStatus.style.color = result.success ? '#27ae60' : '#e74c3c';
         if(result.success) {

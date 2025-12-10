@@ -16,7 +16,18 @@ CREATE TABLE IF NOT EXISTS emails (
   subject TEXT NOT NULL,
   body TEXT,
   from_addr TEXT NOT NULL,
-  todo_flag INTEGER DEFAULT 0
+  todo_flag INTEGER DEFAULT 0,
+  unique_hash TEXT
+);
+
+CREATE TABLE IF NOT EXISTS mail_settings (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  mail_type TEXT,
+  protocol TEXT,
+  mail_id TEXT,
+  mail_pw TEXT,
+  mail_since TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 `);
 
