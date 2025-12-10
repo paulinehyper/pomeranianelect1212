@@ -23,6 +23,7 @@
           <th>수신일</th>
           <th>제목</th>
           <th>발신자</th>
+          <th>To-Do</th>
         </tr>
       </thead>
       <tbody>
@@ -31,16 +32,33 @@
     </table>
   </div>
   <script>
-    window.electronAPI.getEmails().then(emails => {
+    function renderEmails(emails) {
       const tbody = document.getElementById('emailsTable').querySelector('tbody');
       tbody.innerHTML = '';
       emails.forEach(mail => {
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${mail.received_at}</td><td>${mail.subject}</td><td>${mail.from_addr}</td>`;
+        tr.innerHTML = `
+          <td>${mail.received_at}</td>
+          <td>${mail.subject}</td>
+          <td>${mail.from_addr}</td>
+          <td><input type="checkbox" ${mail.todo_flag ? 'checked' : ''} data-id="${mail.id}" /></td>
+        `;
         tr.title = mail.body ? mail.body.substring(0, 200) : '';
         tbody.appendChild(tr);
       });
-    });
+      // 체크박스 이벤트
+      tbody.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        cb.addEventListener('change', async (e) => {
+          const id = cb.getAttribute('data-id');
+          const flag = cb.checked ? 1 : 0;
+          await window.electronAPI.setEmailTodoFlag(id, flag);
+          // 최신 목록 다시 렌더링
+          const emails = await window.electronAPI.getEmails();
+          renderEmails(emails);
+        });
+      });
+    }
+    window.electronAPI.getEmails().then(renderEmails);
   </script>
 </body>
 </html>

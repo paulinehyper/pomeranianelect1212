@@ -1,34 +1,41 @@
 
+
+
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 
 const db = require('./db');
 const setupMailIpc = require('./mail');
 
-
 let mainWindow = null;
 let settingsWindow = null;
 let emailsWindow = null;
-  ipcMain.on('open-emails', () => {
-    if (emailsWindow && !emailsWindow.isDestroyed()) {
-      emailsWindow.focus();
-      return;
+
+ipcMain.handle('set-email-todo-flag', (event, id, flag) => {
+  db.prepare('UPDATE emails SET todo_flag = ? WHERE id = ?').run(flag, id);
+  return { success: true };
+});
+
+ipcMain.on('open-emails', () => {
+  if (emailsWindow && !emailsWindow.isDestroyed()) {
+    emailsWindow.focus();
+    return;
+  }
+  emailsWindow = new BrowserWindow({
+    width: 700,
+    height: 500,
+    resizable: true,
+    minimizable: true,
+    maximizable: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false
     }
-    emailsWindow = new BrowserWindow({
-      width: 700,
-      height: 500,
-      resizable: true,
-      minimizable: true,
-      maximizable: true,
-      webPreferences: {
-        preload: path.join(__dirname, 'preload.js'),
-        contextIsolation: true,
-        nodeIntegration: false
-      }
-    });
-    emailsWindow.loadFile('emails.html');
-    emailsWindow.on('closed', () => { emailsWindow = null; });
   });
+  emailsWindow.loadFile('emails.html');
+  emailsWindow.on('closed', () => { emailsWindow = null; });
+});
 
 function createWindow() {
   mainWindow = new BrowserWindow({

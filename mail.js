@@ -50,7 +50,10 @@ function setupMailIpc(main) {
         const messages = await conn.search(searchCriteria, fetchOptions);
         // 최근 10개만
         const recentMessages = messages.slice(-10);
-        const insert = db.prepare('INSERT INTO emails (received_at, subject, body, from_addr) VALUES (?, ?, ?, ?)');
+        const insert = db.prepare('INSERT INTO emails (received_at, subject, body, from_addr, todo_flag) VALUES (?, ?, ?, ?, ?)');
+        const TODO_KEYWORDS = [
+          '할일', '제출', '마감', '기한', '검토', '확인', '필수', '요청', '과제', '숙제', 'deadline', 'due', 'todo', 'assignment', 'report'
+        ];
         for (const m of recentMessages) {
           const header = m.parts.find(p => p.which.startsWith('HEADER'));
           const bodyPart = m.parts.find(p => p.which === 'TEXT');
@@ -58,7 +61,9 @@ function setupMailIpc(main) {
           const from = header && header.body.from ? header.body.from[0] : '';
           const date = header && header.body.date ? header.body.date[0] : '';
           const body = bodyPart ? bodyPart.body : '';
-          insert.run(date, subject, body, from);
+          const text = (subject + ' ' + (body || '')).toLowerCase();
+          const todoFlag = TODO_KEYWORDS.some(k => text.includes(k)) ? 1 : 0;
+          insert.run(date, subject, body, from, todoFlag);
         }
         await conn.end();
         return { success: true, message: '연동완료!' };

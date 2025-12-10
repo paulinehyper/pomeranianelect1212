@@ -15,7 +15,8 @@ CREATE TABLE IF NOT EXISTS emails (
   received_at TEXT NOT NULL,
   subject TEXT NOT NULL,
   body TEXT,
-  from_addr TEXT NOT NULL
+  from_addr TEXT NOT NULL,
+  todo_flag INTEGER DEFAULT 0
 );
 `);
 
