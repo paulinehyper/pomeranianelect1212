@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>스케줄 위젯</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="widget">
+    <div class="header">
+      <span class="drag-title">스케줄</span>
+      <div class="window-controls">
+        <button class="min-btn" title="최소화">_</button>
+        <button class="close-btn" title="닫기">×</button>
+      </div>
+    </div>
+    <ul class="schedule-list">
+      <!-- 동적 렌더링 -->
+    </ul>
+  </div>
+  <script>
+    document.querySelector('.min-btn').onclick = () => window.electronAPI.minimize();
+    document.querySelector('.close-btn').onclick = () => window.electronAPI.close();
+  </script>
+  <script src="renderer.js"></script>
+</body>
+</html>

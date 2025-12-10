@@ -1,0 +1,14 @@
+{
+  "name": "schedule-widget",
+  "version": "1.0.0",
+  "description": "윈도우 스티커 메모장 스타일의 Electron 스케줄 위젯",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^30.0.0"
+  }
+}
