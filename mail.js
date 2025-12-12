@@ -62,21 +62,24 @@ function setupMailIpc(main) {
         const insert = db.prepare('INSERT INTO emails (received_at, subject, body, from_addr, todo_flag, unique_hash) VALUES (?, ?, ?, ?, ?, ?)');
         const exists = db.prepare('SELECT COUNT(*) as cnt FROM emails WHERE unique_hash = ?');
         const crypto = require('crypto');
-        // 날짜 패턴 추출 함수 (main.js extractDeadline과 동일하게 사용)
-        function extractDeadline(text) {
-          if (!text) return null;
-          const patterns = [
-            /(\d{4})[./-](\d{1,2})[./-](\d{1,2})/, // 2025-12-30
-            /(\d{1,2})[./-](\d{1,2})/, // 12-30
-            /(\d{1,2})월\s?(\d{1,2})일/, // 12월 30일
-            /(\d{1,2})일/, // 30일
-            /(\d{1,2})일까지/ // 30일까지
-          ];
-          for (const re of patterns) {
-            const m = text.match(re);
-            if (m) return m[0];
+        // ONNX 모델 기반 todo 분류 함수
+        const ort = require('onnxruntime-node');
+        let session = null;
+        async function loadModel() {
+          if (!session) {
+            session = await ort.InferenceSession.create('todo_classifier.onnx');
           }
-          return null;
+        }
+        async function isTodoMail(text) {
+          await loadModel();
+          // 텍스트를 전처리하여 모델 입력에 맞게 변환 (예: 토크나이즈, 벡터화)
+          // 아래는 예시: 실제 모델에 맞게 수정 필요
+          const inputTensor = new ort.Tensor('string', [text], [1]);
+          const feeds = { input: inputTensor };
+          const results = await session.run(feeds);
+          // 결과에서 todo 여부 추출 (예: softmax > 0.5)
+          const score = results.output.data[0];
+          return score > 0.8;
         }
         for (const m of messages) {
           const header = m.parts.find(p => p.which.startsWith('HEADER'));
@@ -86,8 +89,33 @@ function setupMailIpc(main) {
           const date = header && header.body.date ? header.body.date[0] : '';
           const body = bodyPart ? bodyPart.body : '';
           const text = (subject + ' ' + (body || '')).toLowerCase();
-          // 본문/제목에서 마감일(날짜) 패턴이 추출되는 경우만 todo_flag=1
-          const todoFlag = extractDeadline(text) ? 1 : 0;
+          // 광고성 메일 필터링
+          const adKeywords = ['instagram', 'facebook', '온라인투어', 'onlinetour', '페이스북', '인스타그램'];
+          const isAdMail = adKeywords.some(kw =>
+            (from && from.toLowerCase().includes(kw)) ||
+            (subject && subject.toLowerCase().includes(kw)) ||
+            (body && body.toLowerCase().includes(kw))
+          );
+          // 마감일 패턴(몇일까지 제출 등)이 있는 경우만 todo로 분류
+          let todoFlag = 0;
+          if (!isAdMail) {
+            // '몇일까지 제출' 등 마감일 패턴
+            const deadlinePatterns = [
+              /(\d{1,2})월\s?(\d{1,2})일.*제출/, // 12월 30일 제출
+              /(\d{1,2})일까지.*제출/,            // 30일까지 제출
+              /(\d{1,2})일.*제출/,                // 30일 제출
+              /by\s+(\d{1,2})[./-](\d{1,2})/i,  // by 12-30
+              /submit.*by.*(\d{1,2})[./-](\d{1,2})/i // submit by 12-30
+            ];
+            const hasDeadline = deadlinePatterns.some(re => text.match(re));
+            if (hasDeadline) {
+              try {
+                todoFlag = await isTodoMail(text) ? 1 : 0;
+              } catch (err) {
+                todoFlag = 1; // 패턴이 있으면 백업으로 무조건 todo 처리
+              }
+            }
+          }
           const hash = crypto.createHash('sha256').update(date + subject).digest('hex');
           if (exists.get(hash).cnt === 0) {
             insert.run(date, subject, body, from, todoFlag, hash);
