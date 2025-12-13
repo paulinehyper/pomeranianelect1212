@@ -34,6 +34,15 @@ function getImapConfig({ mailType, protocol, mailId, mailPw }) {
 }
 
 function setupMailIpc(main) {
+  // 다양한 타입을 안전하게 Buffer로 변환
+  function toBuffer(body) {
+    if (Buffer.isBuffer(body)) return body;
+    if (typeof body === 'string') return Buffer.from(body);
+    if (body && typeof body === 'object' && body.type === 'Buffer' && Array.isArray(body.data)) {
+      return Buffer.from(body.data);
+    }
+    return Buffer.alloc(0);
+  }
   ipcMain.handle('mail-connect', async (event, info) => {
     if (info.protocol.startsWith('imap')) {
       const config = getImapConfig(info);
@@ -52,9 +61,11 @@ function setupMailIpc(main) {
           const sinceStr = `${day}-${month}-${year}`;
           searchCriteria = ['ALL', ['SINCE', sinceStr]];
         }
+        // imap-simple에서 BODY[]와 HEADER.FIELDS를 동시에 요청하면 일부 서버에서 오류가 발생할 수 있음
+        // mailparser를 쓸 때는 BODY[]만 요청하는 것이 가장 호환성이 높음
         const fetchOptions = {
-          bodies: ['HEADER.FIELDS (FROM TO SUBJECT DATE)', 'TEXT'],
-          struct: true,
+          bodies: [''], // '' = RFC822 전체 (BODY[]와 동일, 네이버 호환)
+          struct: false,
           markSeen: false
         };
         const messages = await conn.search(searchCriteria, fetchOptions);
@@ -81,50 +92,39 @@ function setupMailIpc(main) {
           const score = results.output.data[0];
           return score > 0.8;
         }
+        const { simpleParser } = require('mailparser');
         for (const m of messages) {
-          const header = m.parts.find(p => p.which.startsWith('HEADER'));
-          const bodyPart = m.parts.find(p => p.which === 'TEXT');
-          const subject = header && header.body.subject ? header.body.subject[0] : '';
-          const from = header && header.body.from ? header.body.from[0] : '';
-          const date = header && header.body.date ? header.body.date[0] : '';
-          const body = bodyPart ? bodyPart.body : '';
-          const text = (subject + ' ' + (body || '')).toLowerCase();
-          // 광고성 메일 필터링
-          const adKeywords = ['instagram', 'facebook', '온라인투어', 'onlinetour', '페이스북', '인스타그램'];
-          const isAdMail = adKeywords.some(kw =>
-            (from && from.toLowerCase().includes(kw)) ||
-            (subject && subject.toLowerCase().includes(kw)) ||
-            (body && body.toLowerCase().includes(kw))
-          );
-          // 마감일 패턴(몇일까지 제출 등)이 있는 경우만 todo로 분류
-          let todoFlag = 0;
-          if (!isAdMail) {
-            // '몇일까지 제출' 등 마감일 패턴
-            const deadlinePatterns = [
-              /(\d{1,2})월\s?(\d{1,2})일.*제출/, // 12월 30일 제출
-              /(\d{1,2})일까지.*제출/,            // 30일까지 제출
-              /(\d{1,2})일.*제출/,                // 30일 제출
-              /by\s+(\d{1,2})[./-](\d{1,2})/i,  // by 12-30
-              /submit.*by.*(\d{1,2})[./-](\d{1,2})/i // submit by 12-30
-            ];
-            const hasDeadline = deadlinePatterns.some(re => text.match(re));
-            if (hasDeadline) {
-              try {
-                todoFlag = await isTodoMail(text) ? 1 : 0;
-              } catch (err) {
-                todoFlag = 1; // 패턴이 있으면 백업으로 무조건 todo 처리
-              }
-            }
+          // 디버깅: 실제 파트 종류 확인
+          console.log('IMAP parts:', m.parts.map(p => p.which));
+          const rawPart = m.parts.find(p => p.which === '');
+          if (!rawPart) continue;
+
+          const raw = toBuffer(rawPart.body);
+          const parsed = await simpleParser(raw);
+
+          let body = parsed.text || '';
+          if (!body && parsed.html) {
+            const { htmlToText } = require('html-to-text');
+            body = htmlToText(parsed.html, { wordwrap: false });
           }
-          const hash = crypto.createHash('sha256').update(date + subject).digest('hex');
+
+          const subject = parsed.subject || '';
+          const from = parsed.from?.text || '';
+          const date = parsed.date?.toISOString() || '';
+
+          const hash = crypto.createHash('sha256')
+            .update(date + subject)
+            .digest('hex');
+
           if (exists.get(hash).cnt === 0) {
-            insert.run(date, subject, body, from, todoFlag, hash);
+            insert.run(date, subject, body, from, 0, hash);
           }
         }
         await conn.end();
         return { success: true, message: '연동완료!' };
       } catch (e) {
-        return { success: false, message: '연동실패: ' + e.message };
+        console.error('IMAP 연동실패:', e && (e.stack || e.message || e));
+        return { success: false, message: '연동실패: ' + (e && (e.stack || e.message || JSON.stringify(e))) };
       }
     } else {
       return { success: false, message: 'POP3는 미지원' };
