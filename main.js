@@ -1,4 +1,9 @@
 const { app, BrowserWindow, ipcMain, Tray, Menu } = require('electron');
+// 이메일 todo 완료 처리 (todo_flag=2)
+ipcMain.handle('set-email-todo-complete', (event, id) => {
+  db.prepare('UPDATE emails SET todo_flag = 2 WHERE id = ?').run(id);
+  return { success: true };
+});
 let tray = null;
 const path = require('path');
 const db = require('./db');
@@ -20,6 +25,7 @@ ipcMain.on('open-keyword', () => {
     resizable: false,
     alwaysOnTop: true,
     frame: true,
+    icon: path.join(__dirname, 'icon.ico'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -92,10 +98,17 @@ ipcMain.handle('get-mail-settings', () => {
 ipcMain.handle('set-email-todo-flag', (event, id, flag) => {
   db.prepare('UPDATE emails SET todo_flag = ? WHERE id = ?').run(flag, id);
   if (flag == 1) {
-    // 메일 본문+제목을 positive(할일) 샘플로 저장
-    const mail = db.prepare('SELECT subject, body FROM emails WHERE id = ?').get(id);
+    // 메일 본문+제목을 positive(할일) 샘플로 저장 및 todos에 insert
+    const mail = db.prepare('SELECT subject, body, deadline, from_addr FROM emails WHERE id = ?').get(id);
     if (mail) {
-      // 간단히 텍스트 파일에 append (실제 서비스는 별도 DB/CSV/ML 파이프라인 권장)
+      // 중복 방지: subject+body+from_addr+deadline 해시
+      const crypto = require('crypto');
+      const hash = crypto.createHash('sha256').update((mail.subject||'')+(mail.body||'')+(mail.from_addr||'')+(mail.deadline||'')).digest('hex');
+      const exists = db.prepare('SELECT COUNT(*) as cnt FROM todos WHERE unique_hash = ?').get(hash);
+      if (exists.cnt === 0) {
+        db.prepare('INSERT INTO todos (task, memo, deadline, unique_hash) VALUES (?, ?, ?, ?)').run(mail.subject, '', mail.deadline, hash);
+      }
+      // 학습 데이터 저장
       const fs = require('fs');
       const line = `1\t${(mail.subject || '').replace(/\t/g,' ')} ${(mail.body || '').replace(/\t/g,' ')}\n`;
       fs.appendFileSync('todo_train_data.txt', line);
@@ -115,6 +128,7 @@ ipcMain.on('open-emails', () => {
     resizable: true,
     minimizable: true,
     maximizable: true,
+    icon: path.join(__dirname, 'icon.ico'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -134,6 +148,7 @@ function createWindow() {
     frame: false,
     resizable: true,
     transparent: true,
+    icon: path.join(__dirname, 'icon.ico'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -197,13 +212,11 @@ function createWindow() {
   };
 
   ipcMain.handle('get-todos', () => {
-    // 기존 todos + emails에서 todo_flag=1인 메일을 합쳐 반환
+    // todos 테이블만 조회
     const todos = db.prepare('SELECT * FROM todos ORDER BY id').all();
-    const emails = db.prepare('SELECT * FROM emails WHERE todo_flag=1 ORDER BY id DESC').all();
     const now = new Date();
-    const emailTodos = emails.map(mail => {
-      // 마감기한 추출
-      let deadline = mail.deadline || extractDeadline(mail.body);
+    return todos.map(todo => {
+      let deadline = todo.deadline;
       let dday = '없음';
       let date = '없음';
       if (deadline) {
@@ -215,15 +228,14 @@ function createWindow() {
         }
       }
       return {
-        id: `mail-${mail.id}`,
+        id: todo.id,
         date,
         dday,
-        task: mail.subject,
+        task: todo.task,
         deadline: deadline || '없음',
-        memo: mail.memo || ''
+        memo: todo.memo || ''
       };
     });
-    return [...todos, ...emailTodos];
   });
 
   ipcMain.handle('get-emails', () => {
@@ -242,6 +254,7 @@ function createWindow() {
       resizable: false,
       alwaysOnTop: true,
       frame: true,
+      icon: path.join(__dirname, 'icon.ico'),
       webPreferences: {
         preload: path.join(__dirname, 'preload.js'),
         contextIsolation: true,
@@ -300,6 +313,15 @@ app.whenReady().then(() => {
           }
         }
         db.prepare('UPDATE emails SET todo_flag = ? WHERE id = ?').run(todoFlag, mail.id);
+        // todo_flag=1이면 todos에 insert (중복 방지)
+        if (todoFlag === 1) {
+          const crypto = require('crypto');
+          const hash = crypto.createHash('sha256').update((mail.subject||'')+(mail.body||'')+(mail.from_addr||'')+(mail.deadline||'')).digest('hex');
+          const exists = db.prepare('SELECT COUNT(*) as cnt FROM todos WHERE unique_hash = ?').get(hash);
+          if (exists.cnt === 0) {
+            db.prepare('INSERT INTO todos (task, memo, deadline, unique_hash) VALUES (?, ?, ?, ?)').run(mail.subject, '', mail.deadline, hash);
+          }
+        }
       }
     };
     setInterval(analyzeTodos, 60 * 1000);
