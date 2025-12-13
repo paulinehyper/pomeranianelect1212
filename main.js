@@ -29,6 +29,7 @@ ipcMain.on('open-keyword', () => {
   keywordWindow.loadFile('keyword.html');
   keywordWindow.on('closed', () => { keywordWindow = null; });
 });
+
 // Keyword 저장
 ipcMain.handle('insert-keyword', (event, keyword) => {
   try {
@@ -43,6 +44,24 @@ ipcMain.handle('get-keywords', () => {
   try {
     const keywords = db.getAllKeywords();
     return { success: true, keywords };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+// Keyword 수정
+ipcMain.handle('update-keyword', (event, oldKw, newKw) => {
+  try {
+    db.updateKeyword(oldKw, newKw);
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+// Keyword 삭제
+ipcMain.handle('delete-keyword', (event, kw) => {
+  try {
+    db.deleteKeyword(kw);
+    return { success: true };
   } catch (err) {
     return { success: false, error: err.message };
   }

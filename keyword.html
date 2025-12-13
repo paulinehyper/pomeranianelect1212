@@ -8,7 +8,12 @@
     body { background: #fffbe7; }
     .keyword-wrap { margin: 32px auto; max-width: 320px; background: #fffbe7; border-radius: 12px; box-shadow: 0 2px 16px #e2c97b77; padding: 32px 36px; }
     .keyword-list { margin-top: 18px; }
-    .keyword-item { padding: 4px 0; color: #7a5a00; }
+    .keyword-item { padding: 4px 0; color: #7a5a00; display: flex; align-items: center; gap: 8px; }
+    .keyword-edit-input { flex: 1; padding: 4px 8px; border-radius: 6px; border: 1px solid #e2c97b; margin-right: 4px; }
+    .keyword-edit-btn, .keyword-delete-btn, .keyword-save-btn, .keyword-cancel-btn { background: #ffe07a; color: #b48a00; border: none; padding: 2px 10px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 0.95em; margin-left: 2px; }
+    .keyword-delete-btn { background: #ffe9a7; color: #e74c3c; }
+    .keyword-save-btn { background: #27ae60; color: #fff; }
+    .keyword-cancel-btn { background: #bbb; color: #fff; }
     .keyword-input-row { display: flex; gap: 8px; margin-top: 12px; }
     .keyword-input { flex: 1; padding: 6px 8px; border-radius: 6px; border: 1px solid #e2c97b; }
     .keyword-add-btn { background: #ffe07a; color: #b48a00; border: none; padding: 6px 18px; border-radius: 6px; font-weight: bold; cursor: pointer; }
@@ -24,6 +29,7 @@
     <div class="keyword-list" id="keywordList"></div>
   </div>
   <script>
+    let editingKw = null;
     async function loadKeywords() {
       const res = await window.electronAPI.getKeywords();
       const list = document.getElementById('keywordList');
@@ -32,7 +38,57 @@
         res.keywords.forEach(kw => {
           const div = document.createElement('div');
           div.className = 'keyword-item';
-          div.textContent = kw;
+          if (editingKw === kw) {
+            // 편집 모드
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = kw;
+            input.className = 'keyword-edit-input';
+            div.appendChild(input);
+            const saveBtn = document.createElement('button');
+            saveBtn.textContent = '저장';
+            saveBtn.className = 'keyword-save-btn';
+            saveBtn.onclick = async () => {
+              const newKw = input.value.trim();
+              if (newKw && newKw !== kw) {
+                await window.electronAPI.updateKeyword(kw, newKw);
+              }
+              editingKw = null;
+              loadKeywords();
+            };
+            div.appendChild(saveBtn);
+            const cancelBtn = document.createElement('button');
+            cancelBtn.textContent = '취소';
+            cancelBtn.className = 'keyword-cancel-btn';
+            cancelBtn.onclick = () => {
+              editingKw = null;
+              loadKeywords();
+            };
+            div.appendChild(cancelBtn);
+          } else {
+            // 일반 모드
+            const span = document.createElement('span');
+            span.textContent = kw;
+            div.appendChild(span);
+            const editBtn = document.createElement('button');
+            editBtn.textContent = '수정';
+            editBtn.className = 'keyword-edit-btn';
+            editBtn.onclick = () => {
+              editingKw = kw;
+              loadKeywords();
+            };
+            div.appendChild(editBtn);
+            const delBtn = document.createElement('button');
+            delBtn.textContent = '삭제';
+            delBtn.className = 'keyword-delete-btn';
+            delBtn.onclick = async () => {
+              if (confirm('정말 삭제하시겠습니까?')) {
+                await window.electronAPI.deleteKeyword(kw);
+                loadKeywords();
+              }
+            };
+            div.appendChild(delBtn);
+          }
           list.appendChild(div);
         });
       } else {

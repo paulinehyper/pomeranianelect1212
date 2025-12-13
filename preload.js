@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openKeyword: () => ipcRenderer.send('open-keyword'),
   getKeywords: () => ipcRenderer.invoke('get-keywords'),
   insertKeyword: (kw) => ipcRenderer.invoke('insert-keyword', kw),
+  updateKeyword: (oldKw, newKw) => ipcRenderer.invoke('update-keyword', oldKw, newKw),
+  deleteKeyword: (kw) => ipcRenderer.invoke('delete-keyword', kw),
   mailConnect: (info) => ipcRenderer.invoke('mail-connect', info),
   getEmails: () => ipcRenderer.invoke('get-emails'),
   openEmails: () => ipcRenderer.send('open-emails'),

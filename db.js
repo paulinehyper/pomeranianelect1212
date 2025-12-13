@@ -40,14 +40,22 @@ CREATE TABLE IF NOT EXISTS keyword (
 );
 `);
 
+
 // Keyword 삽입 함수
 db.insertKeyword = function(keyword) {
   return db.prepare('INSERT OR IGNORE INTO keyword (keyword) VALUES (?)').run(keyword);
 };
-
 // Keyword 전체 조회 함수
 db.getAllKeywords = function() {
   return db.prepare('SELECT keyword FROM keyword ORDER BY id DESC').all().map(row => row.keyword);
+};
+// Keyword 수정 함수
+db.updateKeyword = function(oldKw, newKw) {
+  return db.prepare('UPDATE keyword SET keyword = ? WHERE keyword = ?').run(newKw, oldKw);
+};
+// Keyword 삭제 함수
+db.deleteKeyword = function(kw) {
+  return db.prepare('DELETE FROM keyword WHERE keyword = ?').run(kw);
 };
 
 
