@@ -1,3 +1,41 @@
+// 완료된 할일 목록 가져오기
+async function fetchCompletedTodos() {
+  return (await window.electronAPI.getTodos()).filter(todo => todo.todo_flag === 2);
+}
+
+function renderCompletedList(todos) {
+  const list = document.getElementById('completed-list');
+  list.innerHTML = '';
+  if (!todos.length) {
+    list.innerHTML = '<li style="color:#888;">완료된 할일이 없습니다.</li>';
+    return;
+  }
+  todos.forEach(todo => {
+    const li = document.createElement('li');
+    li.style.marginBottom = '8px';
+    li.innerHTML = `<span style="text-decoration:line-through;color:#aaa;">${todo.task}</span> <span style="color:#b48a00;">${todo.deadline ? '('+todo.deadline+')' : ''}</span>`;
+    list.appendChild(li);
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const completedBtn = document.querySelector('.completed-btn');
+  const completedModal = document.getElementById('completed-modal');
+  const closeCompletedModal = document.getElementById('close-completed-modal');
+  if (completedBtn && completedModal && closeCompletedModal) {
+    completedBtn.addEventListener('click', async () => {
+      const completed = await fetchCompletedTodos();
+      renderCompletedList(completed);
+      completedModal.style.display = 'flex';
+    });
+    closeCompletedModal.addEventListener('click', () => {
+      completedModal.style.display = 'none';
+    });
+    completedModal.addEventListener('click', (e) => {
+      if (e.target === completedModal) completedModal.style.display = 'none';
+    });
+  }
+});
 async function fetchTodos() {
   return await window.electronAPI.getTodos();
 }

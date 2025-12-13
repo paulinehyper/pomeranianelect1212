@@ -233,7 +233,8 @@ function createWindow() {
         dday,
         task: todo.task,
         deadline: deadline || '없음',
-        memo: todo.memo || ''
+        memo: todo.memo || '',
+        todo_flag: todo.todo_flag // 완료 여부 반환
       };
     });
   });
