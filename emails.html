@@ -58,7 +58,20 @@
         tbody.appendChild(bodyTr);
         // 제목 클릭시 본문 토글
         tr.querySelector('.subject-cell').addEventListener('click', () => {
-          bodyTr.style.display = bodyTr.style.display === 'none' ? '' : 'none';
+          // 새 창에 본문 표시
+          const win = window.open('', '_blank', 'width=600,height=400');
+          win.document.write(`
+            <html><head><title>${mail.subject}</title>
+            <style>body{font-family:sans-serif;background:#fffbe7;padding:24px;}h2{color:#b48a00;}pre{white-space:pre-wrap;word-break:break-all;}</style>
+            </head><body>
+            <h2>${mail.subject}</h2>
+            <div><b>From:</b> ${mail.from_addr}</div>
+            <div><b>Date:</b> ${mail.received_at}</div>
+            <hr/>
+            <pre>${mail.body ? mail.body.replace(/</g,'&lt;').replace(/>/g,'&gt;') : '(본문 없음)'}</pre>
+            </body></html>
+          `);
+          win.document.close();
         });
       });
       // 체크박스 이벤트
