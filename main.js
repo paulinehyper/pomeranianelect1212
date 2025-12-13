@@ -1,5 +1,5 @@
-
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu } = require('electron');
+let tray = null;
 const path = require('path');
 const db = require('./db');
 const setupMailIpc = require('./mail');
@@ -142,6 +142,17 @@ function createWindow() {
   });
   mainWindow.loadFile('index.html');
 
+  // 트레이 아이콘 클릭 시 창 토글
+  if (tray) {
+    tray.on('click', () => {
+      if (mainWindow.isVisible()) {
+        mainWindow.hide();
+      } else {
+        mainWindow.show();
+      }
+    });
+  }
+
   ipcMain.on('minimize', () => {
     mainWindow.minimize();
   });
@@ -244,6 +255,15 @@ function createWindow() {
 
 
 app.whenReady().then(() => {
+    // 트레이 아이콘 생성
+    const iconPath = path.join(__dirname, 'icon.ico');
+    tray = new Tray(iconPath);
+    tray.setToolTip('할일 위젯');
+    tray.setContextMenu(Menu.buildFromTemplate([
+      { label: '열기', click: () => { if (mainWindow) mainWindow.show(); } },
+      { label: '종료', click: () => { app.quit(); } }
+    ]));
+
     // 1분마다 emails 테이블에서 todo_flag가 NULL인 메일을 분석하여 todo_flag 업데이트
     const analyzeTodos = async () => {
       const db = require('./db');
