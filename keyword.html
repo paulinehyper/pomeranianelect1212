@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>keyword</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body { background: #fffbe7; }
+    .keyword-wrap { margin: 32px auto; max-width: 320px; background: #fffbe7; border-radius: 12px; box-shadow: 0 2px 16px #e2c97b77; padding: 32px 36px; }
+    .keyword-list { margin-top: 18px; }
+    .keyword-item { padding: 4px 0; color: #7a5a00; }
+    .keyword-input-row { display: flex; gap: 8px; margin-top: 12px; }
+    .keyword-input { flex: 1; padding: 6px 8px; border-radius: 6px; border: 1px solid #e2c97b; }
+    .keyword-add-btn { background: #ffe07a; color: #b48a00; border: none; padding: 6px 18px; border-radius: 6px; font-weight: bold; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div class="keyword-wrap">
+    <h2 style="color:#b48a00;">키워드 관리</h2>
+    <div class="keyword-input-row">
+      <input type="text" id="keywordInput" class="keyword-input" placeholder="키워드 입력" />
+      <button id="addKeywordBtn" class="keyword-add-btn">추가</button>
+    </div>
+    <div class="keyword-list" id="keywordList"></div>
+  </div>
+  <script>
+    async function loadKeywords() {
+      const res = await window.electronAPI.getKeywords();
+      const list = document.getElementById('keywordList');
+      list.innerHTML = '';
+      if(res.success && res.keywords.length > 0) {
+        res.keywords.forEach(kw => {
+          const div = document.createElement('div');
+          div.className = 'keyword-item';
+          div.textContent = kw;
+          list.appendChild(div);
+        });
+      } else {
+        list.innerHTML = '<div style="color:#bbb;">(등록된 키워드 없음)</div>';
+      }
+    }
+    document.getElementById('addKeywordBtn').onclick = async () => {
+      const input = document.getElementById('keywordInput');
+      const kw = input.value.trim();
+      if(!kw) return;
+      await window.electronAPI.insertKeyword(kw);
+      input.value = '';
+      loadKeywords();
+    };
+    loadKeywords();
+  </script>
+</body>
+</html>

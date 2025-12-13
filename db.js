@@ -32,7 +32,23 @@ CREATE TABLE IF NOT EXISTS mail_settings (
   mail_since TEXT,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS keyword (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  keyword TEXT NOT NULL UNIQUE,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
 `);
+
+// Keyword 삽입 함수
+db.insertKeyword = function(keyword) {
+  return db.prepare('INSERT OR IGNORE INTO keyword (keyword) VALUES (?)').run(keyword);
+};
+
+// Keyword 전체 조회 함수
+db.getAllKeywords = function() {
+  return db.prepare('SELECT keyword FROM keyword ORDER BY id DESC').all().map(row => row.keyword);
+};
 
 
 // Migration: add deadline column if missing

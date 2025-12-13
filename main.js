@@ -1,12 +1,52 @@
+
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
-
 const db = require('./db');
 const setupMailIpc = require('./mail');
-
 let mainWindow = null;
 let settingsWindow = null;
 let emailsWindow = null;
+let keywordWindow = null;
+
+// Keyword 창 열기
+ipcMain.on('open-keyword', () => {
+  if (keywordWindow && !keywordWindow.isDestroyed()) {
+    keywordWindow.focus();
+    return;
+  }
+  keywordWindow = new BrowserWindow({
+    width: 420,
+    height: 340,
+    resizable: false,
+    alwaysOnTop: true,
+    frame: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  });
+  keywordWindow.loadFile('keyword.html');
+  keywordWindow.on('closed', () => { keywordWindow = null; });
+});
+// Keyword 저장
+ipcMain.handle('insert-keyword', (event, keyword) => {
+  try {
+    db.insertKeyword(keyword);
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+// Keyword 전체 조회
+ipcMain.handle('get-keywords', () => {
+  try {
+    const keywords = db.getAllKeywords();
+    return { success: true, keywords };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
 
 ipcMain.handle('save-memo', (event, id, memo) => {
   // id가 'mail-123' 형태면 emails, 아니면 todos

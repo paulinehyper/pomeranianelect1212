@@ -10,7 +10,7 @@
     <div class="header">
       <span class="drag-title">스케줄</span>
       <div class="header-right">
-        
+        <button class="keyword-btn" title="키워드 관리" style="margin-right:8px;background:#ffe07a;color:#b48a00;border:none;padding:4px 12px;border-radius:6px;font-weight:bold;cursor:pointer;">Keyword</button>
         <button class="settings-btn" title="이메일 연동">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
             <rect x="2.5" y="5" width="15" height="10" rx="2" stroke="#b48a00" stroke-width="1.5" fill="#fffbe7"/>
@@ -33,6 +33,10 @@
     // 환경설정 모달 열기/닫기
     document.querySelector('.settings-btn').onclick = () => {
       window.electronAPI.openSettings();
+    };
+    // 키워드 관리 창 열기
+    document.querySelector('.keyword-btn').onclick = () => {
+      window.electronAPI.openKeyword();
     };
     // 연동 상태 예시(실제 연동 시 동적으로 변경)
     // document.getElementById('syncStatusModal').textContent = '연동 중...';

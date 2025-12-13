@@ -163,6 +163,20 @@ function setupMailIpc(main) {
             /~\s*\d{1,2}[./-]\d{1,2}.*(요청|제출|회신|필요)/i
           ];
           let todoFlag = 0;
+          // 1차: AI 분류
+          if (await isTodoMail(text)) {
+            todoFlag = 1;
+          }
+          // 2차: keyword 테이블 기반 분류(복합)
+          try {
+            const keywords = db.getAllKeywords ? db.getAllKeywords() : [];
+            if (keywords.length > 0 && keywords.some(kw => kw && text.includes(kw.toLowerCase()))) {
+              todoFlag = 1;
+            }
+          } catch (e) {
+            console.error('keyword 테이블 조회 오류:', e);
+          }
+          // 기존 마감일/요청 패턴도 유지
           if (deadlinePatterns.some(re => text.match(re))) {
             todoFlag = 1;
           }
