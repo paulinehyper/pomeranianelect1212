@@ -1,4 +1,3 @@
-
 async function fetchTodos() {
   return await window.electronAPI.getTodos();
 }
@@ -42,6 +41,34 @@ function renderList(todos) {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+  const todos = await fetchTodos();
+  renderList(todos);
+});
+
+// 연동하기 버튼(이메일 연동) 클릭 시 새 메일만 동기화
+// settings-btn이 연동 버튼임을 가정
+const syncBtn = document.querySelector('.settings-btn');
+syncBtn.addEventListener('click', async () => {
+  // 메일 설정 가져오기
+  const settings = await window.electronAPI.getMailSettings();
+  if (!settings) {
+    window.electronAPI.openSettings();
+    return;
+  }
+  // DB에서 가장 최근 메일 날짜 조회
+  const latest = await window.electronAPI.getEmails().then(list =>
+    list && list.length > 0 ? list.reduce((a, b) => a.received_at > b.received_at ? a : b).received_at : undefined
+  );
+  const info = {
+    mailType: settings.mail_type,
+    protocol: settings.protocol,
+    mailId: settings.mail_id,
+    mailPw: settings.mail_pw,
+    mailSince: latest
+  };
+  // 메일 연동(최신 메일 이후만)
+  await window.electronAPI.mailConnect(info);
+  // 동기화 후 목록 새로고침
   const todos = await fetchTodos();
   renderList(todos);
 });

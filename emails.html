@@ -39,12 +39,27 @@
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td>${mail.received_at}</td>
-          <td>${mail.subject}</td>
+          <td class="subject-cell" style="cursor:pointer;color:#b48a00;text-decoration:underline;">${mail.subject}</td>
           <td>${mail.from_addr}</td>
           <td><input type="checkbox" ${mail.todo_flag ? 'checked' : ''} data-id="${mail.id}" /></td>
         `;
-        tr.title = mail.body ? mail.body.substring(0, 200) : '';
         tbody.appendChild(tr);
+        // 본문 펼침용 row
+        const bodyTr = document.createElement('tr');
+        bodyTr.style.display = 'none';
+        const bodyTd = document.createElement('td');
+        bodyTd.colSpan = 4;
+        bodyTd.style.background = '#fffbe7';
+        bodyTd.style.color = '#333';
+        bodyTd.style.fontSize = '0.97em';
+        bodyTd.style.padding = '12px 16px';
+        bodyTd.textContent = mail.body || '(본문 없음)';
+        bodyTr.appendChild(bodyTd);
+        tbody.appendChild(bodyTr);
+        // 제목 클릭시 본문 토글
+        tr.querySelector('.subject-cell').addEventListener('click', () => {
+          bodyTr.style.display = bodyTr.style.display === 'none' ? '' : 'none';
+        });
       });
       // 체크박스 이벤트
       tbody.querySelectorAll('input[type="checkbox"]').forEach(cb => {
@@ -59,6 +74,11 @@
       });
     }
     window.electronAPI.getEmails().then(renderEmails);
+    // 1분마다 메일 목록 새로고침
+    setInterval(async () => {
+      const emails = await window.electronAPI.getEmails();
+      if (typeof renderEmails === 'function') renderEmails(emails);
+    }, 60 * 1000);
   </script>
 </body>
 </html>
