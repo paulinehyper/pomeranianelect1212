@@ -32,6 +32,16 @@ ipcMain.handle('get-mail-settings', () => {
 
 ipcMain.handle('set-email-todo-flag', (event, id, flag) => {
   db.prepare('UPDATE emails SET todo_flag = ? WHERE id = ?').run(flag, id);
+  if (flag == 1) {
+    // 메일 본문+제목을 positive(할일) 샘플로 저장
+    const mail = db.prepare('SELECT subject, body FROM emails WHERE id = ?').get(id);
+    if (mail) {
+      // 간단히 텍스트 파일에 append (실제 서비스는 별도 DB/CSV/ML 파이프라인 권장)
+      const fs = require('fs');
+      const line = `1\t${(mail.subject || '').replace(/\t/g,' ')} ${(mail.body || '').replace(/\t/g,' ')}\n`;
+      fs.appendFileSync('todo_train_data.txt', line);
+    }
+  }
   return { success: true };
 });
 
@@ -108,6 +118,11 @@ function createWindow() {
         }
       }
     }
+    // YYYY년 MM월 DD일 패턴 우선 적용
+    const yearMonthDay = body.match(/(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일/);
+    if (yearMonthDay) {
+      return `${yearMonthDay[1]}/${yearMonthDay[2].padStart(2,'0')}/${yearMonthDay[3].padStart(2,'0')}`;
+    }
     return null;
   };
 
@@ -118,14 +133,14 @@ function createWindow() {
     const now = new Date();
     const emailTodos = emails.map(mail => {
       // 마감기한 추출
-      const deadlineStr = extractDeadline(mail.body);
+      let deadline = mail.deadline || extractDeadline(mail.body);
       let dday = '없음';
       let date = '없음';
-      if (deadlineStr) {
-        date = deadlineStr.replace(/\//g, '/');
-        const deadline = new Date(date);
-        if (!isNaN(deadline)) {
-          const diff = Math.ceil((deadline - now) / (1000*60*60*24));
+      if (deadline) {
+        date = deadline.replace(/\//g, '/');
+        const deadlineDate = new Date(date);
+        if (!isNaN(deadlineDate)) {
+          const diff = Math.ceil((deadlineDate - now) / (1000*60*60*24));
           dday = diff >= 0 ? `D-${diff}` : `D+${Math.abs(diff)}`;
         }
       }
@@ -133,7 +148,9 @@ function createWindow() {
         id: `mail-${mail.id}`,
         date,
         dday,
-        task: mail.subject
+        task: mail.subject,
+        deadline: deadline || '없음',
+        memo: mail.memo || ''
       };
     });
     return [...todos, ...emailTodos];
@@ -168,8 +185,76 @@ function createWindow() {
 
 
 app.whenReady().then(() => {
+    // 1분마다 emails 테이블에서 todo_flag가 NULL인 메일을 분석하여 todo_flag 업데이트
+    const analyzeTodos = async () => {
+      const db = require('./db');
+      const ort = require('onnxruntime-node');
+      let session = null;
+      async function loadModel() {
+        if (!session) session = await ort.InferenceSession.create('todo_classifier.onnx');
+      }
+      // 마감일 패턴(몇일까지 제출 등)
+      const deadlinePatterns = [
+        /(\d{1,2})월\s?(\d{1,2})일.*제출/, /(\d{1,2})일까지.*제출/, /(\d{1,2})일.*제출/, /by\s+(\d{1,2})[./-](\d{1,2})/i, /submit.*by.*(\d{1,2})[./-](\d{1,2})/i
+      ];
+      const adKeywords = ['instagram', 'facebook', '온라인투어', 'onlinetour', '페이스북', '인스타그램'];
+      const emails = db.prepare('SELECT * FROM emails WHERE todo_flag IS NULL').all();
+      for (const mail of emails) {
+        const text = ((mail.subject || '') + ' ' + (mail.body || '')).toLowerCase();
+        const from = (mail.from_addr || '').toLowerCase();
+        // 광고성 메일 제외
+        const isAdMail = adKeywords.some(kw => from.includes(kw) || text.includes(kw));
+        let todoFlag = 0;
+        if (!isAdMail) {
+          const hasDeadline = deadlinePatterns.some(re => text.match(re));
+          if (hasDeadline) {
+            try {
+              await loadModel();
+              const inputTensor = new ort.Tensor('string', [text], [1]);
+              const feeds = { input: inputTensor };
+              const results = await session.run(feeds);
+              const score = results.output.data[0];
+              todoFlag = score > 0.8 ? 1 : 0;
+            } catch (err) {
+              todoFlag = 1;
+            }
+          }
+        }
+        db.prepare('UPDATE emails SET todo_flag = ? WHERE id = ?').run(todoFlag, mail.id);
+      }
+    };
+    setInterval(analyzeTodos, 60 * 1000);
+    analyzeTodos();
   createWindow();
   setupMailIpc();
+
+  // 1분마다 환경설정의 메일 계정으로 메일 동기화
+  const { ipcMain } = require('electron');
+  const db = require('./db');
+  const { BrowserWindow } = require('electron');
+  const syncMail = async () => {
+    // 최신 메일 설정 가져오기
+    const row = db.prepare('SELECT * FROM mail_settings ORDER BY id DESC LIMIT 1').get();
+    if (row && row.mail_id && row.mail_pw && row.protocol && row.mail_type) {
+      // mail-connect IPC 핸들러 직접 호출
+      const mailModule = require('./mail');
+      // mail.js의 setupMailIpc에서 ipcMain.handle로 등록된 핸들러를 직접 실행
+      // (ipcMain.handle은 렌더러에서만 호출 가능하므로, mail.js의 내부 함수를 별도로 export하는 것이 더 안전)
+      // 여기서는 ipcMain.invoke 대신 mailModule.syncMail(row) 형태로 구현 권장
+      if (typeof mailModule.syncMail === 'function') {
+        await mailModule.syncMail(row);
+      } else {
+        // fallback: BrowserWindow에서 mail-connect IPC 호출
+        const win = BrowserWindow.getAllWindows()[0];
+        if (win) {
+          win.webContents.send('mail-connect', row);
+        }
+      }
+    }
+  };
+  setInterval(syncMail, 60 * 1000); // 1분마다 실행
+  // 앱 시작 직후에도 1회 실행
+  syncMail();
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });

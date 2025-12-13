@@ -14,7 +14,10 @@
   },
   "dependencies": {
     "better-sqlite3": "^12.5.0",
+    "html-to-text": "^9.0.5",
+    "iconv-lite": "^0.7.1",
     "imap-simple": "^5.1.0",
+    "mailparser": "^3.9.1",
     "onnxruntime-node": "^1.23.2"
   }
 }

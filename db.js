@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS emails (
   from_addr TEXT NOT NULL,
   todo_flag INTEGER DEFAULT 0,
   unique_hash TEXT,
+  deadline TEXT, -- 마감일(YYYY/MM/DD 등)
   memo TEXT DEFAULT ''
 );
 
@@ -32,5 +33,13 @@ CREATE TABLE IF NOT EXISTS mail_settings (
   created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 `);
+
+
+// Migration: add deadline column if missing
+const pragma = db.prepare("PRAGMA table_info(emails)").all();
+const hasDeadline = pragma.some(col => col.name === 'deadline');
+if (!hasDeadline) {
+  db.exec('ALTER TABLE emails ADD COLUMN deadline TEXT');
+}
 
 module.exports = db;
