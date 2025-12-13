@@ -73,25 +73,7 @@ function setupMailIpc(main) {
         const insert = db.prepare('INSERT INTO emails (received_at, subject, body, from_addr, todo_flag, unique_hash, deadline) VALUES (?, ?, ?, ?, ?, ?, ?)');
         const exists = db.prepare('SELECT COUNT(*) as cnt FROM emails WHERE unique_hash = ?');
         const crypto = require('crypto');
-        // ONNX 모델 기반 todo 분류 함수
-        const ort = require('onnxruntime-node');
-        let session = null;
-        async function loadModel() {
-          if (!session) {
-            session = await ort.InferenceSession.create('todo_classifier.onnx');
-          }
-        }
-        async function isTodoMail(text) {
-          await loadModel();
-          // 텍스트를 전처리하여 모델 입력에 맞게 변환 (예: 토크나이즈, 벡터화)
-          // 아래는 예시: 실제 모델에 맞게 수정 필요
-          const inputTensor = new ort.Tensor('string', [text], [1]);
-          const feeds = { input: inputTensor };
-          const results = await session.run(feeds);
-          // 결과에서 todo 여부 추출 (예: softmax > 0.5)
-          const score = results.output.data[0];
-          return score > 0.8;
-        }
+        // ONNX 모델 기반 분류 제거: 키워드/패턴 기반 분류만 사용
         const { simpleParser } = require('mailparser');
         // extractDeadline 함수 main.js에서 복사
         function extractDeadline(body) {
@@ -163,11 +145,8 @@ function setupMailIpc(main) {
             /~\s*\d{1,2}[./-]\d{1,2}.*(요청|제출|회신|필요)/i
           ];
           let todoFlag = 0;
-          // 1차: AI 분류
-          if (await isTodoMail(text)) {
-            todoFlag = 1;
-          }
-          // 2차: keyword 테이블 기반 분류(복합)
+          // 1차: AI 분류 제거, 키워드/패턴 기반만 사용
+          // keyword 테이블 기반 분류(복합)
           try {
             const keywords = db.getAllKeywords ? db.getAllKeywords() : [];
             if (keywords.length > 0 && keywords.some(kw => kw && text.includes(kw.toLowerCase()))) {
