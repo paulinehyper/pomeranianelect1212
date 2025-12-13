@@ -147,9 +147,22 @@ function setupMailIpc(main) {
           let todoFlag = 0;
           // 1차: AI 분류 제거, 키워드/패턴 기반만 사용
           // keyword 테이블 기반 분류(복합)
+          // 기본 내장 키워드(요청, 제출, 회신 등) + 사용자 키워드 모두 검사
+          const defaultKeywords = [
+            '요청', '제출', '회신', '완료', '필요', '해달라', '해 주세요', '해주십시오',
+            'request', 'submit', 'reply', 'complete', 'need', 'please', 'due', 'until', 'by'
+          ];
           try {
-            const keywords = db.getAllKeywords ? db.getAllKeywords() : [];
-            if (keywords.length > 0 && keywords.some(kw => kw && text.includes(kw.toLowerCase()))) {
+            let keywords = [];
+            if (db.getAllKeywords) {
+              keywords = db.getAllKeywords() || [];
+            }
+            // 소문자 변환 및 중복 제거
+            const allKeywords = Array.from(new Set([
+              ...defaultKeywords.map(k => k.toLowerCase()),
+              ...keywords.map(k => (typeof k === 'string' ? k.toLowerCase() : (k.keyword || '').toLowerCase()))
+            ])).filter(Boolean);
+            if (allKeywords.some(kw => kw && text.includes(kw))) {
               todoFlag = 1;
             }
           } catch (e) {
