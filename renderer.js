@@ -133,8 +133,10 @@ function renderList(todos) {
     const isCompleted = isMail && item.todo_flag === 2;
     li.innerHTML = `
       ${deadlineHtml}
-      <span class="date">${item.date}</span> 
-      <span class="d-day">${item.dday}</span> 
+      <span class="date">${item.date} </span>
+      <span style="display:inline-block;width:8px;"></span>
+      <span class="d-day">${item.dday}</span>
+      <span style="display:inline-block;width:8px;"></span>
       <span class="task" style="${isCompleted ? 'text-decoration:line-through;color:#aaa;' : ''}">${item.task}</span>
       <button class="memo-edit-btn" title="메모 추가/수정" style="background:transparent;border:none;cursor:pointer;margin-left:8px;">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
