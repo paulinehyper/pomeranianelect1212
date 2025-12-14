@@ -1,5 +1,8 @@
 const Database = require('better-sqlite3');
-const db = new Database('todo.db');
+const path = require('path');
+const dbPath = path.join(__dirname, 'todo.db');
+console.log('DB 경로:', dbPath);
+const db = new Database(dbPath);
 
 db.exec(`
 CREATE TABLE IF NOT EXISTS todos (
@@ -9,8 +12,6 @@ CREATE TABLE IF NOT EXISTS todos (
   task TEXT NOT NULL,
   memo TEXT DEFAULT ''
 );
-DELETE FROM todos;
-INSERT INTO todos (date, dday, task) VALUES ('12/30', 'D-100', '할일100');
 CREATE TABLE IF NOT EXISTS emails (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   received_at TEXT NOT NULL,

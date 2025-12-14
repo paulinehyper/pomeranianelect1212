@@ -1,5 +1,12 @@
+
 const { app, BrowserWindow, ipcMain, Tray, Menu } = require('electron');
 const path = require('path');
+
+// 할일 제외(숨김) 처리: todo_flag=0
+ipcMain.handle('exclude-todo', (event, id) => {
+  db.prepare('UPDATE todos SET todo_flag=0 WHERE id=?').run(id);
+  return { success: true };
+});
 
 // OS별 아이콘 경로 분기
 const iconPath =
@@ -11,14 +18,9 @@ const winIcon = iconPath;
 // 사용자 직접 할일 추가
 ipcMain.handle('insert-todo', (event, { task, deadline, memo }) => {
   try {
-    // deadline이 없으면 null, memo는 빈 문자열 허용
-    db.insertTodo({
-      date: deadline || '',
-      dday: '',
-      task,
-      memo: memo || '',
-      deadline: deadline || ''
-    });
+    // deadline이 없으면 null, memo는 빈 문자열 허용, todo_flag=1로 저장
+    db.prepare('INSERT INTO todos (date, dday, task, memo, deadline, todo_flag) VALUES (?, ?, ?, ?, ?, 1)')
+      .run(deadline || '', '', task, memo || '', deadline || '');
     return { success: true };
   } catch (err) {
     return { success: false, error: err.message };
@@ -236,8 +238,8 @@ function createWindow() {
   };
 
   ipcMain.handle('get-todos', () => {
-    // todos 테이블만 조회
-    const todos = db.prepare('SELECT * FROM todos ORDER BY id').all();
+    // todo_flag=1(할일)만 조회
+    const todos = db.prepare('SELECT * FROM todos WHERE todo_flag=1 ORDER BY id').all();
     const now = new Date();
     return todos.map(todo => {
       let deadline = todo.deadline;

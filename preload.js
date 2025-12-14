@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getEmails: () => ipcRenderer.invoke('get-emails'),
   openEmails: () => ipcRenderer.send('open-emails'),
   setEmailTodoFlag: (id, flag) => ipcRenderer.invoke('set-email-todo-flag', id, flag),
+  excludeTodo: (id) => ipcRenderer.invoke('exclude-todo', id),
   setEmailTodoComplete: (id) => ipcRenderer.invoke('set-email-todo-complete', id),
   getMailSettings: () => ipcRenderer.invoke('get-mail-settings'),
   saveMailSettings: (settings) => ipcRenderer.invoke('save-mail-settings', settings),

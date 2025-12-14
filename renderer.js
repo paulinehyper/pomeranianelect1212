@@ -186,9 +186,10 @@ function renderList(todos) {
     // 제외 버튼 클릭 시 확인창 후 제외 처리
     excludeBtn.addEventListener('click', async () => {
       if (confirm('할일 목록에서 제외하시겠습니까?')) {
-        // 이메일 기반 todo만 제외 처리 (id가 mail-로 시작)
         if (typeof item.id === 'string' && item.id.startsWith('mail-')) {
           await window.electronAPI.setEmailTodoFlag(item.id.replace('mail-', ''), 0);
+        } else {
+          await window.electronAPI.excludeTodo(item.id);
         }
         // 제외 후 목록 새로고침
         const todos = await fetchTodos();
