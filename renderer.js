@@ -94,8 +94,8 @@ function renderList(todos) {
       <span class="task" style="${isCompleted ? 'text-decoration:line-through;color:#aaa;' : ''}">${item.task}</span>
       <button class="memo-edit-btn" title="메모 추가/수정" style="background:transparent;border:none;cursor:pointer;margin-left:8px;">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect x="3" y="3" width="18" height="18" rx="3" fill="#ffe07a" stroke="#b48a00" stroke-width="1.5"/>
-          <path d="M16 21v-4a1 1 0 0 1 1-1h4" stroke="#b48a00" stroke-width="1.5" fill="#fffbe7"/>
+          <rect x="3" y="3" width="18" height="18" rx="3" fill="#7affcaff" stroke="#00b49cff" stroke-width="1.5"/>
+          <path d="M16 21v-4a1 1 0 0 1 1-1h4" stroke="#00b478ff" stroke-width="1.5" fill="#ffffffff"/>
         </svg>
       </button>
       <button class="exclude-btn" title="할일 목록에서 제외" style="background:transparent;border:none;cursor:pointer;margin-left:4px;">
@@ -116,7 +116,7 @@ function renderList(todos) {
             }
             // 취소선 토글(즉시 반영)
             taskSpan.style.textDecoration = 'line-through';
-            taskSpan.style.color = '#aaa';
+            taskSpan.style.color = '#01fad0ff';
             // 목록 새로고침
             const todos = await fetchTodos();
             renderList(todos);
@@ -197,7 +197,7 @@ const refreshBtn = document.createElement('button');
 refreshBtn.className = 'refresh-btn';
 refreshBtn.title = '새로고침';
 refreshBtn.style.marginRight = '8px';
-refreshBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 10a6 6 0 1 1 6 6" stroke="#b48a00" stroke-width="1.5" fill="none"/><path d="M4 14v-4h4" stroke="#b48a00" stroke-width="1.5" fill="none"/></svg>`;
+refreshBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M17.65 6.35A8 8 0 1 0 20 12" stroke="#00b48a" stroke-width="2" fill="none" stroke-linecap="round"/><polyline points="20,4 20,8 16,8" stroke="#00b48a" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 headerRight.insertBefore(refreshBtn, headerRight.firstChild);
 refreshBtn.addEventListener('click', async () => {
   const todos = await fetchTodos();
