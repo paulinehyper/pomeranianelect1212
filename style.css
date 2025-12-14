@@ -1,3 +1,50 @@
+/* 이메일 연동설정창 드래그 이동 가능 영역 */
+.settings-drag-title {
+  -webkit-app-region: drag;
+  user-select: none;
+}
+/* 이메일 연동설정창 스타일 */
+.settings-wrap, .settings-wrap * {
+  color: #686868 !important;
+}
+.settings-wrap {
+  position: static;
+  width: 60%;
+  height: 80%;
+  margin: 0;
+  padding: 10px 10px;
+  background: #fff;
+  border-radius: 20px;
+  box-shadow: 0 2px 16px #01fbb477;
+  border: 1.5px solid #7be2c5;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  box-sizing: border-box;
+}
+.settings-wrap form {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+.form-row {
+  width: 80%;
+  display: flex;
+  align-items: center;
+  margin-bottom: 16px;
+  gap: 10px;
+  justify-content: center;
+}
+.form-row label {
+  min-width: 110px;
+  text-align: right;
+}
+.short-input {
+  min-width: 220px;
+  max-width: 340px;
+  width: 100%;
+}
 .sidebar-icons {
   position: absolute;
   top: 70px;
@@ -163,7 +210,7 @@
 .modal-title {
   font-size: 1.1em;
   font-weight: bold;
-  color: #03dafc;
+  color: #1f3e39;
   margin-bottom: 10px;
 }
 .form-row {
@@ -174,7 +221,7 @@
 }
 .form-row label {
   min-width: 70px;
-  color:  #03dafc;
+  color:  #1f3e39;
   font-weight: bold;
 }
 .form-row input, .form-row select {
@@ -186,9 +233,9 @@
   background: #ffffff;
 }
 .connect-btn {
-  background: #a7fffc;
-  color: #00abb4;
-  border: 1px solid #7be2d9;
+  background: #a7ffda;
+  color:#1f3e39;
+  border: 1px solid #7be2c3;
   border-radius: 5px;
   padding: 5px 16px;
   font-weight: bold;

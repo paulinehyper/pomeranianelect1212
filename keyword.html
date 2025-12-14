@@ -5,8 +5,34 @@
   <title>keyword</title>
   <link rel="stylesheet" href="style.css">
   <style>
-    body { background: #e7fffe; }
-    .keyword-wrap { margin: 32px auto; max-width: 340px; background: #fff; border-radius: 14px; box-shadow: 0 2px 16px #7be2c577; padding: 32px 36px; border: 1.5px solid #7be2c5; }
+    html, body {
+      background: transparent;
+      width: 100vw;
+      height: 100vh;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+    .keyword-wrap {
+      margin: 0 auto;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 520px;
+      min-height: 350px;
+      max-width: 96vw;
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: 0 2px 16px #7be2c577;
+      padding: 32px 36px;
+      border: 1.5px solid #7be2c5;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      height: 350px;
+      box-sizing: border-box;
+    }
     .keyword-list { margin-top: 18px; }
     .keyword-item { padding: 4px 0; color: #0093b4; display: flex; align-items: center; gap: 8px; }
     .keyword-edit-input { flex: 1; padding: 4px 8px; border-radius: 6px; border: 1px solid #7be2c5; margin-right: 4px; }
@@ -24,14 +50,22 @@
 </head>
 <body>
   <div class="keyword-wrap">
-    <h2 style="color:#b48a00;">키워드 관리</h2>
-    <div class="keyword-input-row">
-      <input type="text" id="keywordInput" class="keyword-input" placeholder="키워드 입력" />
-      <button id="addKeywordBtn" class="keyword-add-btn">추가</button>
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:18px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;width:100%;margin-bottom:8px;">
+        <h2 style="color:#b48a00;margin:0;">키워드 관리</h2>
+        <button id="close-keyword-modal" style="background:transparent;border:none;font-size:1.5em;cursor:pointer;color:#00b48a;line-height:1;">×</button>
+      </div>
+      <div class="keyword-input-row" style="width:100%;max-width:360px;">
+        <input type="text" id="keywordInput" class="keyword-input" placeholder="키워드 입력" />
+        <button id="addKeywordBtn" class="keyword-add-btn">추가</button>
+      </div>
+      <div class="keyword-list" id="keywordList" style="width:100%;max-width:360px;"></div>
     </div>
-    <div class="keyword-list" id="keywordList"></div>
   </div>
   <script>
+    document.getElementById('close-keyword-modal').onclick = () => {
+      window.close();
+    };
     let editingKw = null;
     async function loadKeywords() {
       const res = await window.electronAPI.getKeywords();

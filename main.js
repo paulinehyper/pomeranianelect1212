@@ -41,7 +41,7 @@ ipcMain.on('open-keyword', () => {
     height: 340,
     resizable: false,
     alwaysOnTop: true,
-    frame: true,
+    frame: false, // 커스텀 프레임
     icon: path.join(__dirname, 'icon.ico'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -266,19 +266,20 @@ function createWindow() {
       settingsWindow.focus();
       return;
     }
-    settingsWindow = new BrowserWindow({
-      width: 640,
-      height: 500,
-      resizable: false,
-      alwaysOnTop: true,
-      frame: true,
-      icon: path.join(__dirname, 'icon.ico'),
-      webPreferences: {
-        preload: path.join(__dirname, 'preload.js'),
-        contextIsolation: true,
-        nodeIntegration: false
-      }
-    });
+      settingsWindow = new BrowserWindow({
+        width: 800,
+        height: 480,
+        resizable: false,
+        alwaysOnTop: true,
+        frame: false, // 프레임리스
+        transparent: true, // 투명 배경
+        icon: path.join(__dirname, 'icon.ico'),
+        webPreferences: {
+          preload: path.join(__dirname, 'preload.js'),
+          contextIsolation: true,
+          nodeIntegration: false
+        }
+      });
     settingsWindow.loadFile('settings.html');
     settingsWindow.on('closed', () => { settingsWindow = null; });
   });
