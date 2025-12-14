@@ -1,3 +1,33 @@
+.sidebar-icons {
+  position: absolute;
+  top: 70px;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  align-items: center;
+  width: 48px;
+  z-index: 10;
+  padding-top: 8px;
+}
+.main-body-row {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+}
+.sidebar-icons-spacer {
+  width: 48px;
+  min-width: 48px;
+  height: 1px;
+}
+.header-icons {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-right: 18px;
+  align-items: flex-start;
+  justify-content: flex-start;
+}
 /* 플로팅 + 버튼 스타일 */
 #add-todo-fab {
   position: absolute;
@@ -88,6 +118,24 @@
   justify-content: center;
 }
 .settings-btn:hover {
+  background: #ffffff;
+}
+
+.keyword-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0 2px;
+  margin-left: 2px;
+  border-radius: 4px;
+  transition: background 0.15s;
+  height: 24px;
+  width: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.keyword-btn:hover {
   background: #ffffff;
 }
 
@@ -233,24 +281,28 @@ body {
 /* 스케쥴 리스트 가로폭 확장 */
 .schedule-list {
   list-style: none;
-  padding: 0;
+  padding: 0 12px 0 24px;
   margin: 0;
   min-width: 60px;
   width: 100%;
 }
 /* 할일 카드 가로폭 확장 */
+  /* 카드에 위젯 내부 패딩 효과 */
 .schedule-list li {
   display: flex;
   align-items: center;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
   font-size: 1em;
   background: #c1ffe6;
-  border-radius: 6px;
-  padding: 6px 10px;
+  border-radius: 8px;
+  padding: 10px 18px 10px 18px;
   box-shadow: 0 1px 2px rgba(0,0,0,0.04);
-  min-width: 400px;
+  min-width: 360px;
   width: 100%;
   word-break: break-all;
+  margin-left: 0;
+  margin-right: 0;
+}
 /* 메모 입력란 스타일 개선 */
 .memo {
   flex: 2;
