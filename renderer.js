@@ -13,7 +13,7 @@ function renderCompletedList(todos) {
   todos.forEach(todo => {
     const li = document.createElement('li');
     li.style.marginBottom = '8px';
-    li.innerHTML = `<span style="text-decoration:line-through;color:#aaa;">${todo.task}</span> <span style="color:#b48a00;">${todo.deadline ? '('+todo.deadline+')' : ''}</span>`;
+    li.innerHTML = `<span style="text-decoration:line-through;color:#00b49cff;">${todo.task}</span> <span style="color:#b48a00;">${todo.deadline ? '('+todo.deadline+')' : ''}</span>`;
     list.appendChild(li);
   });
 }
@@ -82,7 +82,7 @@ function renderList(todos) {
     // deadline 표시: item.deadline이 있고, date와 다를 때만 보여주기
     let deadlineHtml = '';
     if (item.deadline && item.deadline !== '없음' && item.deadline !== item.date) {
-      deadlineHtml = `<span class="deadline" style="color:#b48a00;font-weight:bold;margin-right:6px;">마감: ${item.deadline}</span>`;
+      deadlineHtml = `<span class="deadline" style="color:#00b49cff;font-weight:bold;margin-right:6px;">마감: ${item.deadline}</span>`;
     }
     // 완료 상태인지 확인 (이메일 기반만 지원)
     const isMail = typeof item.id === 'string' && item.id.startsWith('mail-');

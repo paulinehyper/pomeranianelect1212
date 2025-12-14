@@ -1,3 +1,9 @@
+.memo:focus {
+  outline: none;
+  border: 2px solid #00b49c;
+  box-shadow: 0 0 0 2px #7be2c555;
+  background: #f6fffd;
+}
 /* 새로고침 버튼 외곽선 제거 및 스타일 */
 .refresh-btn {
   border: none;
