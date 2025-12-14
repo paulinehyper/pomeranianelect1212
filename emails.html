@@ -58,8 +58,8 @@
         tbody.appendChild(bodyTr);
         // 제목 클릭시 본문 토글
         tr.querySelector('.subject-cell').addEventListener('click', () => {
-          // 새 창에 본문 표시
-          const win = window.open('', '_blank', 'width=600,height=400');
+          // 새 창에 본문 표시 (항상 맨 앞에 오도록 focus)
+          const win = window.open('', '_blank', 'width=600,height=400,alwaysRaised=yes,popup=yes');
           win.document.write(`
             <html><head><title>${mail.subject}</title>
             <style>body{font-family:sans-serif;background:#fffbe7;padding:24px;}h2{color:#b48a00;}pre{white-space:pre-wrap;word-break:break-all;}</style>
@@ -72,6 +72,7 @@
             </body></html>
           `);
           win.document.close();
+          win.focus();
         });
       });
       // 체크박스 이벤트
