@@ -1,8 +1,8 @@
 /* 플로팅 + 버튼 스타일 */
 #add-todo-fab {
-  position: fixed;
-  right: 36px;
-  bottom: 36px;
+  position: absolute;
+  right: 24px;
+  bottom: 24px;
   z-index: 1200;
   width: 56px;
   height: 56px;
@@ -172,7 +172,9 @@ body {
 }
 
 /* 스케쥴 위젯 가로폭 확장 */
- .widget {
+/* 위젯 내부에 +버튼이 위치하도록 relative 지정 */
+.widget {
+  position: relative;
   background: #fff;
   width: 520px;
   min-height: 350px;
