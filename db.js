@@ -4,8 +4,6 @@ const dbPath = path.join(__dirname, 'todo.db');
 console.log('DB 경로:', dbPath);
 const db = new Database(dbPath);
 
-// 기존 emails 테이블 삭제(드롭) 및 재생성 (초기화)
-db.exec('DROP TABLE IF EXISTS emails;');
 
 db.exec(`
 CREATE TABLE IF NOT EXISTS todos (

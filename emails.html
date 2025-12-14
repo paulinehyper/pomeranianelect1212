@@ -12,18 +12,18 @@
           background: #fff;
         }
     body { background: #618082; }
-    .emails-table { width: 100%; border-collapse: collapse; margin-top: 20px; background: #f0f9f9; }
-    .emails-table th, .emails-table td { border: 1px solid #5b5a5a; padding: 8px; font-size: 0.95em; background: #aefdf7; color: #222; }
-    .emails-table th { background: #e2fef8; color: #636262; }
-    .emails-table tr:nth-child(even) { background: #43bfb1; }
-    .emails-table tr:hover { background: #b0f8e9; color: #222; }
+    .emails-table { width: 100%; border-collapse: collapse; margin-top: 20px; background: #fff; }
+    .emails-table th, .emails-table td { border: 1px solid #e0e0e0; padding: 8px; font-size: 0.95em; background: #f9f9f9; color: #222; }
+    .emails-table th { background: #f3f3f3; color: #636262; }
+    .emails-table tr:nth-child(even) { background: #fff; }
+    .emails-table tr:hover { background: #eaf6ff; color: #222; }
     .emails-header { font-size: 1.2em; font-weight: bold; margin-top: 10px; color: #222; }
     /* 모달용 */
     #mailModal { background: rgba(213, 228, 227, 0.32)!important; }
-    #mailModalContent { background: #627574!important; color: #222!important; }
+    #mailModalContent { background: #fff!important; color: #222!important; }
     #closeMailModal { color: #333!important; }
     #mailModalContent h2 { color: #222!important; }
-    #mailModalContent pre { background: none; color: #222; }
+    #mailModalContent pre { background: #fff!important; color: #222; }
   </style>
 </head>
 <body>
@@ -51,7 +51,7 @@
       <div style="margin-bottom:8px;"><b>From:</b> <span id="modalFrom" style="color:#222;"></span></div>
       <div style="margin-bottom:8px;"><b>Date:</b> <span id="modalDate" style="color:#222;"></span></div>
       <hr/>
-      <pre id="modalBody" style="white-space:pre-wrap;word-break:break-all;background:none;padding:0;margin:0;color:#222;"></pre>
+      <pre id="modalBody" style="white-space:pre-wrap;word-break:break-all;background:#fff;padding:0;margin:0;color:#222;"></pre>
     </div>
   </div>
   <script>
