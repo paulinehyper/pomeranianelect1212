@@ -12,6 +12,12 @@ CREATE TABLE IF NOT EXISTS todos (
   task TEXT NOT NULL,
   memo TEXT DEFAULT ''
 );
+
+CREATE TABLE IF NOT EXISTS autoplay (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  enabled INTEGER DEFAULT 0
+);
+INSERT OR IGNORE INTO autoplay (id, enabled) VALUES (1, 0);
 CREATE TABLE IF NOT EXISTS emails (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   received_at TEXT NOT NULL,
@@ -31,6 +37,7 @@ CREATE TABLE IF NOT EXISTS mail_settings (
   mail_id TEXT,
   mail_pw TEXT,
   mail_since TEXT,
+  mail_server TEXT,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -73,6 +80,11 @@ const todosPragma = db.prepare("PRAGMA table_info(todos)").all();
 const todosHasDeadline = todosPragma.some(col => col.name === 'deadline');
 if (!todosHasDeadline) {
   db.exec('ALTER TABLE todos ADD COLUMN deadline TEXT');
+}
+// Migration: add todo_flag column to todos if missing
+const todosHasTodoFlag = todosPragma.some(col => col.name === 'todo_flag');
+if (!todosHasTodoFlag) {
+  db.exec('ALTER TABLE todos ADD COLUMN todo_flag INTEGER DEFAULT 1');
 }
 
 // Migration: add deadline column to emails if missing

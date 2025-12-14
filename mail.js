@@ -2,9 +2,12 @@ const { ipcMain } = require('electron');
 const Imap = require('imap-simple');
 const db = require('./db');
 
-function getImapConfig({ mailType, protocol, mailId, mailPw }) {
+function getImapConfig({ mailType, protocol, mailId, mailPw, mail_server }) {
   let host, port, tls;
-  if (mailType === 'naver') {
+  // Use user-provided mail_server if present, otherwise fallback to default
+  if (mail_server && mail_server.trim()) {
+    host = mail_server.trim();
+  } else if (mailType === 'naver') {
     host = 'imap.naver.com';
   } else if (mailType === 'gmail') {
     host = 'imap.gmail.com';
@@ -16,19 +19,20 @@ function getImapConfig({ mailType, protocol, mailId, mailPw }) {
   } else if (protocol === 'imap') {
     port = 143; tls = false;
   } else if (protocol === 'pop3-ssl') {
-    // POP3는 별도 구현 필요, 여기선 IMAP만 예시
     port = 995; tls = true;
   } else if (protocol === 'pop3') {
     port = 110; tls = false;
   }
+  // 네이버도 반드시 전체 이메일 주소를 입력하도록 변경
   return {
     imap: {
-      user: mailId,
+      user: mailId, // mailId는 반드시 전체 이메일 주소여야 함
       password: mailPw,
       host,
       port,
       tls,
-      authTimeout: 5000
+      authTimeout: 5000,
+      tlsOptions: { rejectUnauthorized: false } // Allow self-signed certs (dev/test only)
     }
   };
 }
@@ -45,37 +49,154 @@ function setupMailIpc(main) {
   }
   ipcMain.handle('mail-connect', async (event, info) => {
     if (info.protocol.startsWith('imap')) {
+      // IMAP 메일 가져와서 DB 저장
       const config = getImapConfig(info);
       try {
         const conn = await Imap.connect(config);
-        // INBOX에서 메일 불러오기 (mailSince 있으면 해당 날짜 이후)
         const box = await conn.openBox('INBOX');
-        let searchCriteria = ['ALL'];
+        let searchCriteria = [];
         if (info.mailSince) {
-          // IMAP에서 SINCE DD-MMM-YYYY 형식 필요 (예: 10-Dec-2025)
-          const dateObj = new Date(info.mailSince);
-          const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-          const day = dateObj.getDate();
-          const month = months[dateObj.getMonth()];
-          const year = dateObj.getFullYear();
-          const sinceStr = `${day}-${month}-${year}`;
-          searchCriteria = ['ALL', ['SINCE', sinceStr]];
+          searchCriteria = [["SINCE", new Date(info.mailSince)]];
+        } else {
+          searchCriteria = ["ALL"];
         }
-        // imap-simple에서 BODY[]와 HEADER.FIELDS를 동시에 요청하면 일부 서버에서 오류가 발생할 수 있음
-        // mailparser를 쓸 때는 BODY[]만 요청하는 것이 가장 호환성이 높음
         const fetchOptions = {
-          bodies: [''], // '' = RFC822 전체 (BODY[]와 동일, 네이버 호환)
-          struct: false,
-          markSeen: false
+          bodies: ["HEADER", "TEXT"],
+          struct: true
         };
         const messages = await conn.search(searchCriteria, fetchOptions);
-        // 최근 10개 제한 제거: 조건에 맞는 모든 메일 저장
+        console.log('[IMAP] 검색된 메일 개수:', messages.length);
+        const { simpleParser } = require('mailparser');
+        const crypto = require('crypto');
         const insert = db.prepare('INSERT INTO emails (received_at, subject, body, from_addr, todo_flag, unique_hash, deadline) VALUES (?, ?, ?, ?, ?, ?, ?)');
         const exists = db.prepare('SELECT COUNT(*) as cnt FROM emails WHERE unique_hash = ?');
-        const crypto = require('crypto');
-        // ONNX 모델 기반 분류 제거: 키워드/패턴 기반 분류만 사용
+        function extractDeadline(body) {
+          if (!body) return null;
+          const patterns = [
+            /(\d{4})[./-](\d{1,2})[./-](\d{1,2})/,
+            /(\d{1,2})[./-](\d{1,2})/,
+            /(\d{1,2})월\s?(\d{1,2})일/,
+            /(\d{1,2})일/,
+            /(\d{1,2})일까지/
+          ];
+          for (const re of patterns) {
+            const m = body.match(re);
+            if (m) {
+              if (m.length >= 4 && m[1].length === 4) {
+                return `${m[1]}/${m[2].padStart(2,'0')}/${m[3].padStart(2,'0')}`;
+              } else if (m.length >= 3 && re === patterns[1]) {
+                return `${new Date().getFullYear()}/${m[1].padStart(2,'0')}/${m[2].padStart(2,'0')}`;
+              } else if (m.length >= 3 && re === patterns[2]) {
+                return `${new Date().getFullYear()}/${m[1].padStart(2,'0')}/${m[2].padStart(2,'0')}`;
+              } else if (m.length >= 2 && (re === patterns[3] || re === patterns[4])) {
+                return `${new Date().getFullYear()}/${(new Date().getMonth()+1).toString().padStart(2,'0')}/${m[1].padStart(2,'0')}`;
+              }
+            }
+          }
+          const yearMonthDay = body.match(/(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일/);
+          if (yearMonthDay) {
+            return `${yearMonthDay[1]}/${yearMonthDay[2].padStart(2,'0')}/${yearMonthDay[3].padStart(2,'0')}`;
+          }
+          return null;
+        }
+        for (const msg of messages) {
+          try {
+            // HEADER와 TEXT 파트 분리
+            const headerPart = msg.parts.find(p => p.which === 'HEADER');
+            const textPart = msg.parts.find(p => p.which === 'TEXT');
+            // HEADER 파싱
+            let subject = '', from = '', date = '';
+            if (headerPart && headerPart.body) {
+              // imap-simple은 HEADER를 객체로 반환함
+              subject = Array.isArray(headerPart.body.subject) ? headerPart.body.subject[0] : (headerPart.body.subject || '');
+              from = Array.isArray(headerPart.body.from) ? headerPart.body.from[0] : (headerPart.body.from || '');
+              date = Array.isArray(headerPart.body.date) ? headerPart.body.date[0] : (headerPart.body.date || '');
+            }
+            // 본문 파싱
+            let body = '';
+            if (textPart && textPart.body) {
+              body = textPart.body;
+            }
+            // fallback: simpleParser로 한 번 더 파싱 (본문이 html일 경우 등)
+            if (!body && textPart) {
+              const { simpleParser } = require('mailparser');
+              try {
+                const parsed = await simpleParser(textPart.body);
+                body = parsed.text || '';
+                if (!body && parsed.html) {
+                  const { htmlToText } = require('html-to-text');
+                  body = htmlToText(parsed.html, { wordwrap: false });
+                }
+              } catch (e) {}
+            }
+            // 날짜 ISO 포맷 변환
+            let isoDate = '';
+            if (date) {
+              const d = new Date(date);
+              if (!isNaN(d)) isoDate = d.toISOString();
+            }
+            const hash = crypto.createHash('sha256').update((isoDate || date) + subject).digest('hex');
+            const text = (subject + ' ' + body).toLowerCase();
+            const deadlinePatterns = [
+              /\d{1,2}월\s?\d{1,2}일.*(제출|요청|회신|완료|필요|해달라|해 주세요|해주십시오)/,
+              /\d{1,2}일까지.*(제출|요청|회신|완료|필요|해달라|해 주세요|해주십시오)/,
+              /\d{1,2}일.*(제출|요청|회신|완료|필요|해달라|해 주세요|해주십시오)/,
+              /by\s+\d{1,2}[./-]\d{1,2}/i,
+              /submit.*by.*\d{1,2}[./-]\d{1,2}/i,
+              /~\s*\d{1,2}[./-]\d{1,2}.*(요청|제출|회신|필요)/i
+            ];
+            let todoFlag = 0;
+            const defaultKeywords = [
+              '요청', '제출', '회신', '완료', '필요', '해달라', '해 주세요', '해주십시오',
+              'request', 'submit', 'reply', 'complete', 'need', 'please', 'due', 'until', 'by'
+            ];
+            try {
+              let keywords = [];
+              if (db.getAllKeywords) {
+                keywords = db.getAllKeywords() || [];
+              }
+              const allKeywords = Array.from(new Set([
+                ...defaultKeywords.map(k => k.toLowerCase()),
+                ...keywords.map(k => (typeof k === 'string' ? k.toLowerCase() : (k.keyword || '').toLowerCase()))
+              ])).filter(Boolean);
+              if (allKeywords.some(kw => kw && text.includes(kw))) {
+                todoFlag = 1;
+              }
+            } catch (e) {}
+            if (deadlinePatterns.some(re => text.match(re))) {
+              todoFlag = 1;
+            }
+            const deadline = extractDeadline(subject + ' ' + body);
+            console.log(`[IMAP] 메일: subject="${subject}", from="${from}", date="${isoDate || date}"`);
+            if (exists.get(hash).cnt === 0) {
+              try {
+                insert.run(isoDate || date, subject, body, from, todoFlag, hash, deadline);
+                console.log(`[IMAP] DB 저장 성공: subject="${subject}"`);
+              } catch (err) {
+                console.error(`[IMAP] DB 저장 실패: subject="${subject}", error=`, err);
+              }
+            } else {
+              console.log(`[IMAP] 이미 저장된 메일: subject="${subject}"`);
+            }
+          } catch (err) {
+            console.error('[IMAP] 메일 파싱/저장 중 오류:', err);
+          }
+        }
+        await conn.end();
+        return { success: true, message: '연동완료!' };
+      } catch (e) {
+        console.error('IMAP 연동실패:', e && (e.stack || e.message || e));
+        return { success: false, message: '연동실패: ' + (e && (e.stack || e.message || JSON.stringify(e))) };
+      }
+    } else if (info.protocol.startsWith('pop3')) {
+      // POP3 연동 (node-poplib)
+      try {
+        const Pop3Client = require('poplib');
         const { simpleParser } = require('mailparser');
-        // extractDeadline 함수 main.js에서 복사
+        const crypto = require('crypto');
+        const insert = db.prepare('INSERT INTO emails (received_at, subject, body, from_addr, todo_flag, unique_hash, deadline) VALUES (?, ?, ?, ?, ?, ?, ?)');
+        const exists = db.prepare('SELECT COUNT(*) as cnt FROM emails WHERE unique_hash = ?');
+        // extractDeadline 함수 재사용
         function extractDeadline(body) {
           if (!body) return null;
           const patterns = [
@@ -89,104 +210,121 @@ function setupMailIpc(main) {
             const m = body.match(re);
             if (m) {
               if (m.length >= 4 && m[1].length === 4) {
-                // YYYY-MM-DD
                 return `${m[1]}/${m[2].padStart(2,'0')}/${m[3].padStart(2,'0')}`;
               } else if (m.length >= 3 && re === patterns[1]) {
-                // MM/DD
                 return `${new Date().getFullYear()}/${m[1].padStart(2,'0')}/${m[2].padStart(2,'0')}`;
               } else if (m.length >= 3 && re === patterns[2]) {
-                // MM월 DD일
                 return `${new Date().getFullYear()}/${m[1].padStart(2,'0')}/${m[2].padStart(2,'0')}`;
               } else if (m.length >= 2 && (re === patterns[3] || re === patterns[4])) {
-                // DD일, DD일까지
                 return `${new Date().getFullYear()}/${(new Date().getMonth()+1).toString().padStart(2,'0')}/${m[1].padStart(2,'0')}`;
               }
             }
           }
-          // YYYY년 MM월 DD일 패턴 우선 적용
           const yearMonthDay = body.match(/(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일/);
           if (yearMonthDay) {
             return `${yearMonthDay[1]}/${yearMonthDay[2].padStart(2,'0')}/${yearMonthDay[3].padStart(2,'0')}`;
           }
           return null;
         }
-        for (const m of messages) {
-          // 디버깅: 실제 파트 종류 확인
-          console.log('IMAP parts:', m.parts.map(p => p.which));
-          const rawPart = m.parts.find(p => p.which === '');
-          if (!rawPart) continue;
-
-          const raw = toBuffer(rawPart.body);
-          const parsed = await simpleParser(raw);
-
-          let body = parsed.text || '';
-          if (!body && parsed.html) {
-            const { htmlToText } = require('html-to-text');
-            body = htmlToText(parsed.html, { wordwrap: false });
+        // POP3 연결
+        // poplib: new POP3Client(port, host, options)
+        const pop3 = new Pop3Client(
+          info.protocol === 'pop3-ssl' ? 995 : 110,
+          info.mail_server,
+          {
+            tlserrs: false,
+            enabletls: info.protocol === 'pop3-ssl',
+            debug: false
           }
-
-          const subject = parsed.subject || '';
-          const from = parsed.from?.text || '';
-          const date = parsed.date?.toISOString() || '';
-
-          const hash = crypto.createHash('sha256')
-            .update(date + subject)
-            .digest('hex');
-
-          // 제목+본문에서 마감/요청 패턴이 있으면 todo_flag=1
-          const text = (subject + ' ' + body).toLowerCase();
-          // 마감일/요청 패턴 (예: 12월 30일까지 제출, 30일까지 회신, by 12-30, ~까지 요청 등)
-          const deadlinePatterns = [
-            /\d{1,2}월\s?\d{1,2}일.*(제출|요청|회신|완료|필요|해달라|해 주세요|해주십시오)/,
-            /\d{1,2}일까지.*(제출|요청|회신|완료|필요|해달라|해 주세요|해주십시오)/,
-            /\d{1,2}일.*(제출|요청|회신|완료|필요|해달라|해 주세요|해주십시오)/,
-            /by\s+\d{1,2}[./-]\d{1,2}/i,
-            /submit.*by.*\d{1,2}[./-]\d{1,2}/i,
-            /~\s*\d{1,2}[./-]\d{1,2}.*(요청|제출|회신|필요)/i
-          ];
-          let todoFlag = 0;
-          // 1차: AI 분류 제거, 키워드/패턴 기반만 사용
-          // keyword 테이블 기반 분류(복합)
-          // 기본 내장 키워드(요청, 제출, 회신 등) + 사용자 키워드 모두 검사
-          const defaultKeywords = [
-            '요청', '제출', '회신', '완료', '필요', '해달라', '해 주세요', '해주십시오',
-            'request', 'submit', 'reply', 'complete', 'need', 'please', 'due', 'until', 'by'
-          ];
-          try {
-            let keywords = [];
-            if (db.getAllKeywords) {
-              keywords = db.getAllKeywords() || [];
+        );
+        return await new Promise((resolve, reject) => {
+          pop3.on('error', err => {
+            resolve({ success: false, message: 'POP3 연동실패: ' + (err && (err.stack || err.message || JSON.stringify(err))) });
+          });
+          pop3.on('connect', () => {
+            pop3.login(info.mailId, info.mailPw);
+          });
+          pop3.on('login', (status, rawdata) => {
+            if (!status) {
+              resolve({ success: false, message: 'POP3 로그인 실패: ' + rawdata });
+              pop3.quit();
+              return;
             }
-            // 소문자 변환 및 중복 제거
-            const allKeywords = Array.from(new Set([
-              ...defaultKeywords.map(k => k.toLowerCase()),
-              ...keywords.map(k => (typeof k === 'string' ? k.toLowerCase() : (k.keyword || '').toLowerCase()))
-            ])).filter(Boolean);
-            if (allKeywords.some(kw => kw && text.includes(kw))) {
-              todoFlag = 1;
+            pop3.list();
+          });
+          pop3.on('list', (status, msgcount) => {
+            if (!status || !msgcount) {
+              resolve({ success: false, message: 'POP3 메일 없음' });
+              pop3.quit();
+              return;
             }
-          } catch (e) {
-            console.error('keyword 테이블 조회 오류:', e);
-          }
-          // 기존 마감일/요청 패턴도 유지
-          if (deadlinePatterns.some(re => text.match(re))) {
-            todoFlag = 1;
-          }
-
-          // 마감일 추출 (제목+본문)
-          const deadline = extractDeadline(subject + ' ' + body);
-          if (exists.get(hash).cnt === 0) {
-            insert.run(date, subject, body, from, todoFlag, hash, deadline);
-          }
-        }
-        await conn.end();
-        return { success: true, message: '연동완료!' };
+            let fetched = 0;
+            let done = false;
+            for (let i = 1; i <= msgcount; i++) {
+              pop3.retr(i);
+            }
+            pop3.on('retr', async (msgnum, data) => {
+              fetched++;
+              try {
+                const parsed = await simpleParser(data);
+                let body = parsed.text || '';
+                if (!body && parsed.html) {
+                  const { htmlToText } = require('html-to-text');
+                  body = htmlToText(parsed.html, { wordwrap: false });
+                }
+                const subject = parsed.subject || '';
+                const from = parsed.from?.text || '';
+                const date = parsed.date?.toISOString() || '';
+                const hash = crypto.createHash('sha256').update(date + subject).digest('hex');
+                const text = (subject + ' ' + body).toLowerCase();
+                const deadlinePatterns = [
+                  /\d{1,2}월\s?\d{1,2}일.*(제출|요청|회신|완료|필요|해달라|해 주세요|해주십시오)/,
+                  /\d{1,2}일까지.*(제출|요청|회신|완료|필요|해달라|해 주세요|해주십시오)/,
+                  /\d{1,2}일.*(제출|요청|회신|완료|필요|해달라|해 주세요|해주십시오)/,
+                  /by\s+\d{1,2}[./-]\d{1,2}/i,
+                  /submit.*by.*\d{1,2}[./-]\d{1,2}/i,
+                  /~\s*\d{1,2}[./-]\d{1,2}.*(요청|제출|회신|필요)/i
+                ];
+                let todoFlag = 0;
+                const defaultKeywords = [
+                  '요청', '제출', '회신', '완료', '필요', '해달라', '해 주세요', '해주십시오',
+                  'request', 'submit', 'reply', 'complete', 'need', 'please', 'due', 'until', 'by'
+                ];
+                try {
+                  let keywords = [];
+                  if (db.getAllKeywords) {
+                    keywords = db.getAllKeywords() || [];
+                  }
+                  const allKeywords = Array.from(new Set([
+                    ...defaultKeywords.map(k => k.toLowerCase()),
+                    ...keywords.map(k => (typeof k === 'string' ? k.toLowerCase() : (k.keyword || '').toLowerCase()))
+                  ])).filter(Boolean);
+                  if (allKeywords.some(kw => kw && text.includes(kw))) {
+                    todoFlag = 1;
+                  }
+                } catch (e) {}
+                if (deadlinePatterns.some(re => text.match(re))) {
+                  todoFlag = 1;
+                }
+                const deadline = extractDeadline(subject + ' ' + body);
+                if (exists.get(hash).cnt === 0) {
+                  insert.run(date, subject, body, from, todoFlag, hash, deadline);
+                }
+              } catch (e) {}
+              if (fetched === msgcount && !done) {
+                done = true;
+                pop3.quit();
+                resolve({ success: true, message: 'POP3 연동완료!' });
+              }
+            });
+          });
+        });
       } catch (e) {
-        console.error('IMAP 연동실패:', e && (e.stack || e.message || e));
-        return { success: false, message: '연동실패: ' + (e && (e.stack || e.message || JSON.stringify(e))) };
+        console.error('POP3 연동실패:', e && (e.stack || e.message || e));
+        return { success: false, message: 'POP3 연동실패: ' + (e && (e.stack || e.message || JSON.stringify(e))) };
       }
     } else {
-      return { success: false, message: 'POP3는 미지원' };
+      return { success: false, message: '지원하지 않는 프로토콜' };
     }
   });
 }

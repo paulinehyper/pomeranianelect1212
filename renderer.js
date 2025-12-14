@@ -1,3 +1,12 @@
+// 환경설정(톱니바퀴) 아이콘 클릭 시 app-settings.html 새 창 열기
+document.addEventListener('DOMContentLoaded', () => {
+  const cogBtn = document.querySelector('.cog-btn');
+  if (cogBtn) {
+    cogBtn.addEventListener('click', () => {
+      window.electronAPI.openAppSettings();
+    });
+  }
+});
 // 할일 추가 플로팅 버튼 및 모달 동작
 document.addEventListener('DOMContentLoaded', () => {
   const fab = document.getElementById('add-todo-fab');

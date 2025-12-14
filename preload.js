@@ -19,5 +19,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getMailSettings: () => ipcRenderer.invoke('get-mail-settings'),
   saveMailSettings: (settings) => ipcRenderer.invoke('save-mail-settings', settings),
   saveMemo: (id, memo) => ipcRenderer.invoke('save-memo', id, memo),
-  insertTodo: (todo) => ipcRenderer.invoke('insert-todo', todo)
+  insertTodo: (todo) => ipcRenderer.invoke('insert-todo', todo),
+  openAppSettings: () => ipcRenderer.send('open-app-settings'),
+  getAutoLaunch: () => ipcRenderer.invoke('get-auto-launch'),
+  setAutoLaunch: (enable) => ipcRenderer.invoke('set-auto-launch', enable)
 });

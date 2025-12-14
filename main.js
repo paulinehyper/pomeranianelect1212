@@ -1,10 +1,99 @@
 
 const { app, BrowserWindow, ipcMain, Tray, Menu } = require('electron');
 const path = require('path');
+const autoLauncher = require('./auto-launch');
+
+// 환경설정(app-settings.html) 창 열기
+let appSettingsWindow = null;
+ipcMain.on('open-app-settings', () => {
+  if (appSettingsWindow && !appSettingsWindow.isDestroyed()) {
+    appSettingsWindow.focus();
+    return;
+  }
+  appSettingsWindow = new BrowserWindow({
+    width: 420,
+    height: 260,
+    resizable: false,
+    minimizable: false,
+    maximizable: false,
+    alwaysOnTop: true,
+    title: '환경설정',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  });
+  appSettingsWindow.loadFile('app-settings.html');
+  appSettingsWindow.on('closed', () => { appSettingsWindow = null; });
+});
+
+// 자동실행 상태 조회/변경 IPC
+const db = require('./db');
+ipcMain.handle('get-auto-launch', async () => {
+  try {
+    const row = db.prepare('SELECT enabled FROM autoplay WHERE id=1').get();
+    return !!(row && row.enabled);
+  } catch (e) {
+    return false;
+  }
+});
+ipcMain.handle('set-auto-launch', async (event, enable) => {
+  try {
+    db.prepare('UPDATE autoplay SET enabled=? WHERE id=1').run(enable ? 1 : 0);
+    if (enable) {
+      await autoLauncher.enable();
+    } else {
+      await autoLauncher.disable();
+    }
+    return true;
+  } catch (e) {
+    return false;
+  }
+});
+
+// 배포용: mail_settings 초기화 (mail_id, mail_pw, mail_since 비움) 및 자동실행 등록
+app.once('ready', async () => {
+  try {
+    // mail_settings 테이블이 있으면 모두 삭제
+    db.prepare('DELETE FROM mail_settings').run();
+    // 빈 값으로 1개 레코드 삽입 (mail_id, mail_pw, mail_since 비움)
+    db.prepare('INSERT INTO mail_settings (mail_type, protocol, mail_id, mail_pw, mail_since) VALUES (?, ?, ?, ?, ?)')
+      .run('naver', 'imap-ssl', '', '', '');
+  } catch (e) {
+    // 무시
+  }
+  // 자동실행 등록 (윈도우/맥 모두 지원)
+  try {
+    if (!(await autoLauncher.isEnabled())) {
+      await autoLauncher.enable();
+    }
+  } catch (e) {
+    // 무시 (권한 문제 등)
+  }
+});
 
 // 할일 제외(숨김) 처리: todo_flag=0
 ipcMain.handle('exclude-todo', (event, id) => {
   db.prepare('UPDATE todos SET todo_flag=0 WHERE id=?').run(id);
+  // 학습데이터에서 해당 할일(메일 기반일 경우 subject+body 포함된 줄)도 삭제
+  try {
+    // todos에서 unique_hash가 있으면 메일 기반임
+    const todo = db.prepare('SELECT * FROM todos WHERE id=?').get(id);
+    if (todo && todo.unique_hash) {
+      // emails에서 subject/body 찾기
+      const mail = db.prepare('SELECT subject, body FROM emails WHERE unique_hash=?').get(todo.unique_hash);
+      if (mail) {
+        const fs = require('fs');
+        const lines = fs.readFileSync('todo_train_data.txt', 'utf-8').split('\n');
+        const filtered = lines.filter(line => {
+          // subject 또는 body가 포함된 줄은 제외
+          return !(line.includes(mail.subject) || line.includes(mail.body));
+        });
+        fs.writeFileSync('todo_train_data.txt', filtered.join('\n'));
+      }
+    }
+  } catch (e) { /* 무시 */ }
   return { success: true };
 });
 
@@ -32,7 +121,6 @@ ipcMain.handle('set-email-todo-complete', (event, id) => {
   return { success: true };
 });
 let tray = null;
-const db = require('./db');
 const setupMailIpc = require('./mail');
 let mainWindow = null;
 let settingsWindow = null;
@@ -111,8 +199,9 @@ ipcMain.handle('save-memo', (event, id, memo) => {
 });
 
 ipcMain.handle('save-mail-settings', (event, settings) => {
-  const stmt = db.prepare(`INSERT INTO mail_settings (mail_type, protocol, mail_id, mail_pw, mail_since) VALUES (?, ?, ?, ?, ?)`);
-  stmt.run(settings.mailType, settings.protocol, settings.mailId, settings.mailPw, settings.mailSince);
+  // Save mail_server as well
+  const stmt = db.prepare(`INSERT INTO mail_settings (mail_type, protocol, mail_id, mail_pw, mail_since, mail_server) VALUES (?, ?, ?, ?, ?, ?)`);
+  stmt.run(settings.mailType, settings.protocol, settings.mailId, settings.mailPw, settings.mailSince, settings.mailServer);
   return { success: true };
 });
 
@@ -155,6 +244,7 @@ ipcMain.on('open-emails', () => {
     minimizable: true,
     maximizable: true,
     icon: winIcon,
+    alwaysOnTop: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -162,6 +252,7 @@ ipcMain.on('open-emails', () => {
     }
   });
   emailsWindow.loadFile('emails.html');
+  emailsWindow.setAlwaysOnTop(true);
   emailsWindow.on('closed', () => { emailsWindow = null; });
 });
 
@@ -306,7 +397,7 @@ app.whenReady().then(() => {
 
     // 1분마다 emails 테이블에서 todo_flag가 NULL인 메일을 분석하여 todo_flag 업데이트
     const analyzeTodos = async () => {
-      const db = require('./db');
+      // const db = require('./db');
       const ort = require('onnxruntime-node');
       let session = null;
       async function loadModel() {
@@ -358,7 +449,7 @@ app.whenReady().then(() => {
 
   // 1분마다 환경설정의 메일 계정으로 메일 동기화
   const { ipcMain } = require('electron');
-  const db = require('./db');
+  // const db = require('./db');
   const { BrowserWindow } = require('electron');
   const syncMail = async () => {
     // 최신 메일 설정 가져오기
@@ -369,13 +460,15 @@ app.whenReady().then(() => {
       // mail.js의 setupMailIpc에서 ipcMain.handle로 등록된 핸들러를 직접 실행
       // (ipcMain.handle은 렌더러에서만 호출 가능하므로, mail.js의 내부 함수를 별도로 export하는 것이 더 안전)
       // 여기서는 ipcMain.invoke 대신 mailModule.syncMail(row) 형태로 구현 권장
-      if (typeof mailModule.syncMail === 'function') {
-        await mailModule.syncMail(row);
+          if (typeof mailModule.syncMail === 'function') {
+            // Ensure mail_server is included in row (for custom server)
+            await mailModule.syncMail({ ...row, mail_server: row.mail_server });
       } else {
         // fallback: BrowserWindow에서 mail-connect IPC 호출
         const win = BrowserWindow.getAllWindows()[0];
         if (win) {
-          win.webContents.send('mail-connect', row);
+              // Pass mail_server as well
+              win.webContents.send('mail-connect', { ...row, mail_server: row.mail_server });
         }
       }
     }
