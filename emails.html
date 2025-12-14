@@ -31,6 +31,17 @@
       </tbody>
     </table>
   </div>
+  <!-- 메일 본문 모달 -->
+  <div id="mailModal" style="display:none;position:fixed;z-index:9999;left:0;top:0;width:100vw;height:100vh;background:rgba(0,0,0,0.32);align-items:center;justify-content:center;">
+    <div id="mailModalContent" style="background:#fffbe7;padding:32px 28px 24px 28px;border-radius:12px;box-shadow:0 4px 32px #b48a0055;max-width:600px;width:90vw;max-height:80vh;overflow:auto;position:relative;">
+      <button id="closeMailModal" style="position:absolute;top:12px;right:16px;font-size:1.3em;background:none;border:none;color:#b48a00;cursor:pointer;">&times;</button>
+      <h2 id="modalSubject" style="color:#b48a00;margin-top:0;"></h2>
+      <div style="margin-bottom:8px;"><b>From:</b> <span id="modalFrom"></span></div>
+      <div style="margin-bottom:8px;"><b>Date:</b> <span id="modalDate"></span></div>
+      <hr/>
+      <pre id="modalBody" style="white-space:pre-wrap;word-break:break-all;background:none;padding:0;margin:0;"></pre>
+    </div>
+  </div>
   <script>
     function renderEmails(emails) {
       const tbody = document.getElementById('emailsTable').querySelector('tbody');
@@ -58,21 +69,18 @@
         tbody.appendChild(bodyTr);
         // 제목 클릭시 본문 토글
         tr.querySelector('.subject-cell').addEventListener('click', () => {
-          // 새 창에 본문 표시 (항상 맨 앞에 오도록 focus)
-          const win = window.open('', '_blank', 'width=600,height=400,alwaysRaised=yes,popup=yes');
-          win.document.write(`
-            <html><head><title>${mail.subject}</title>
-            <style>body{font-family:sans-serif;background:#fffbe7;padding:24px;}h2{color:#b48a00;}pre{white-space:pre-wrap;word-break:break-all;}</style>
-            </head><body>
-            <h2>${mail.subject}</h2>
-            <div><b>From:</b> ${mail.from_addr}</div>
-            <div><b>Date:</b> ${mail.received_at}</div>
-            <hr/>
-            <pre>${mail.body ? mail.body.replace(/</g,'&lt;').replace(/>/g,'&gt;') : '(본문 없음)'}</pre>
-            </body></html>
-          `);
-          win.document.close();
-          win.focus();
+          // 모달에 본문 표시
+          document.getElementById('modalSubject').textContent = mail.subject;
+          document.getElementById('modalFrom').textContent = mail.from_addr;
+          document.getElementById('modalDate').textContent = mail.received_at;
+          document.getElementById('modalBody').innerHTML = mail.body ? mail.body.replace(/</g,'&lt;').replace(/>/g,'&gt;') : '(본문 없음)';
+          document.getElementById('mailModal').style.display = 'flex';
+          // ESC로 닫기
+          document.onkeydown = function(e) {
+            if (e.key === 'Escape') document.getElementById('mailModal').style.display = 'none';
+          };
+          // 포커스 close 버튼
+          setTimeout(() => { document.getElementById('closeMailModal').focus(); }, 100);
         });
       });
       // 체크박스 이벤트
@@ -86,6 +94,14 @@
           renderEmails(emails);
         });
       });
+      // 모달 닫기 버튼 이벤트
+      document.getElementById('closeMailModal').onclick = function() {
+        document.getElementById('mailModal').style.display = 'none';
+      };
+      // 모달 바깥 클릭 시 닫기
+      document.getElementById('mailModal').onclick = function(e) {
+        if (e.target === this) this.style.display = 'none';
+      };
     }
     window.electronAPI.getEmails().then(renderEmails);
     // 1분마다 메일 목록 새로고침
