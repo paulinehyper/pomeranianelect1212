@@ -59,10 +59,25 @@ db.deleteKeyword = function(kw) {
 };
 
 
-// Migration: add deadline column if missing
-const pragma = db.prepare("PRAGMA table_info(emails)").all();
-const hasDeadline = pragma.some(col => col.name === 'deadline');
-if (!hasDeadline) {
+// todos 테이블에 할일을 저장하는 함수 (deadline 컬럼 포함)
+// 사용 예: db.insertTodo({ date: '2025-12-13', dday: 'D-1', task: '할일', memo: '메모', deadline: '2025-12-13' })
+db.insertTodo = function({ date, dday, task, memo, deadline }) {
+  return db.prepare('INSERT INTO todos (date, dday, task, memo, deadline) VALUES (?, ?, ?, ?, ?)').run(date, dday, task, memo || '', deadline || '');
+};
+
+
+
+// Migration: add deadline column to todos if missing
+const todosPragma = db.prepare("PRAGMA table_info(todos)").all();
+const todosHasDeadline = todosPragma.some(col => col.name === 'deadline');
+if (!todosHasDeadline) {
+  db.exec('ALTER TABLE todos ADD COLUMN deadline TEXT');
+}
+
+// Migration: add deadline column to emails if missing
+const emailsPragma = db.prepare("PRAGMA table_info(emails)").all();
+const emailsHasDeadline = emailsPragma.some(col => col.name === 'deadline');
+if (!emailsHasDeadline) {
   db.exec('ALTER TABLE emails ADD COLUMN deadline TEXT');
 }
 

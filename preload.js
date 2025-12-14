@@ -17,5 +17,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setEmailTodoComplete: (id) => ipcRenderer.invoke('set-email-todo-complete', id),
   getMailSettings: () => ipcRenderer.invoke('get-mail-settings'),
   saveMailSettings: (settings) => ipcRenderer.invoke('save-mail-settings', settings),
-  saveMemo: (id, memo) => ipcRenderer.invoke('save-memo', id, memo)
+  saveMemo: (id, memo) => ipcRenderer.invoke('save-memo', id, memo),
+  insertTodo: (todo) => ipcRenderer.invoke('insert-todo', todo)
 });

@@ -1,4 +1,21 @@
 const { app, BrowserWindow, ipcMain, Tray, Menu } = require('electron');
+
+// 사용자 직접 할일 추가
+ipcMain.handle('insert-todo', (event, { task, deadline, memo }) => {
+  try {
+    // deadline이 없으면 null, memo는 빈 문자열 허용
+    db.insertTodo({
+      date: deadline || '',
+      dday: '',
+      task,
+      memo: memo || '',
+      deadline: deadline || ''
+    });
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
 // 이메일 todo 완료 처리 (todo_flag=2)
 ipcMain.handle('set-email-todo-complete', (event, id) => {
   db.prepare('UPDATE emails SET todo_flag = 2 WHERE id = ?').run(id);

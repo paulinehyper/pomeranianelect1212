@@ -1,3 +1,43 @@
+/* 플로팅 + 버튼 스타일 */
+#add-todo-fab {
+  position: fixed;
+  right: 36px;
+  bottom: 36px;
+  z-index: 1200;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #00b49c;
+  color: #fff;
+  font-size: 2.2em;
+  box-shadow: 0 4px 16px #00b49c33;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+#add-todo-fab:hover {
+  background: #0093b4;
+}
+/* 할일 추가 모달 오버레이 스타일 */
+#add-todo-modal {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+@keyframes urgent-blink {
+  0%, 100% { box-shadow: 0 0 0 0 #ff3b00cc, 0 2px 8px #0001; }
+  50% { box-shadow: 0 0 12px 4px #ff3b00cc, 0 2px 8px #0001; }
+}
+.urgent-blink {
+  animation: urgent-blink 1s infinite;
+  border: 2px solid #ff3b00;
+}
 .memo:focus {
   outline: none;
   border: 2px solid #00b49c;

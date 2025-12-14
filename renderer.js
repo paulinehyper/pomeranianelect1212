@@ -1,3 +1,34 @@
+// 할일 추가 플로팅 버튼 및 모달 동작
+document.addEventListener('DOMContentLoaded', () => {
+  const fab = document.getElementById('add-todo-fab');
+  const modal = document.getElementById('add-todo-modal');
+  const closeBtn = document.getElementById('close-add-todo-modal');
+  const saveBtn = document.getElementById('save-add-todo');
+  const taskInput = document.getElementById('add-todo-task');
+  const deadlineInput = document.getElementById('add-todo-deadline');
+  if (fab && modal && closeBtn && saveBtn && taskInput && deadlineInput) {
+    fab.onclick = () => {
+      modal.style.display = 'flex';
+      taskInput.value = '';
+      deadlineInput.value = '';
+      setTimeout(() => taskInput.focus(), 100);
+    };
+    closeBtn.onclick = () => { modal.style.display = 'none'; };
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
+    saveBtn.onclick = async () => {
+      const task = taskInput.value.trim();
+      const deadline = deadlineInput.value;
+      if (!task) { taskInput.focus(); return; }
+      // DB에 저장 (electronAPI에 insertTodo가 있다고 가정)
+      await window.electronAPI.insertTodo({ task, deadline });
+      modal.style.display = 'none';
+      const todos = await fetchTodos();
+      renderList(todos);
+    };
+    taskInput.addEventListener('keydown', e => { if (e.key === 'Enter') saveBtn.click(); });
+    deadlineInput.addEventListener('keydown', e => { if (e.key === 'Enter') saveBtn.click(); });
+  }
+});
 // 완료된 할일 목록 가져오기
 async function fetchCompletedTodos() {
   return (await window.electronAPI.getTodos()).filter(todo => todo.todo_flag === 2);
@@ -44,7 +75,13 @@ function renderList(todos) {
   const list = document.querySelector('.schedule-list');
   list.innerHTML = '';
   let dragSrcIdx = null;
-  todos.forEach((item, idx) => {
+  // 데드라인이 빠른 순서로 정렬 (없음/미설정은 맨 뒤)
+  const sortedTodos = [...todos].sort((a, b) => {
+    if (!a.deadline || a.deadline === '없음') return 1;
+    if (!b.deadline || b.deadline === '없음') return -1;
+    return new Date(a.deadline) - new Date(b.deadline);
+  });
+  sortedTodos.forEach((item, idx) => {
     const li = document.createElement('li');
     li.setAttribute('draggable', 'true');
     li.setAttribute('data-idx', idx);
@@ -81,8 +118,15 @@ function renderList(todos) {
     const memo = item.memo || '';
     // deadline 표시: item.deadline이 있고, date와 다를 때만 보여주기
     let deadlineHtml = '';
+    let isUrgent = false;
     if (item.deadline && item.deadline !== '없음' && item.deadline !== item.date) {
       deadlineHtml = `<span class="deadline" style="color:#00b49cff;font-weight:bold;margin-right:6px;">마감: ${item.deadline}</span>`;
+      // 오늘이거나 이미 지난 데드라인이면 긴급
+      const today = new Date();
+      const deadlineDate = new Date(item.deadline);
+      today.setHours(0,0,0,0);
+      deadlineDate.setHours(0,0,0,0);
+      if (deadlineDate <= today) isUrgent = true;
     }
     // 완료 상태인지 확인 (이메일 기반만 지원)
     const isMail = typeof item.id === 'string' && item.id.startsWith('mail-');
@@ -106,6 +150,7 @@ function renderList(todos) {
       </button>
       <textarea class="memo" placeholder="메모/부연설명" rows="2" style="display:none;">${memo}</textarea>
     `;
+    if (isUrgent) li.classList.add('urgent-blink');
         // 더블클릭 시 취소선 토글 및 완료 처리
         const taskSpan = li.querySelector('.task');
         if (taskSpan && !isCompleted) {
