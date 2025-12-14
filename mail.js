@@ -38,6 +38,103 @@ function getImapConfig({ mailType, protocol, mailId, mailPw, mail_server }) {
 }
 
 function setupMailIpc(main) {
+  // 내부에서 직접 호출 가능한 syncMail 함수 export
+  async function syncMail(info) {
+    if (info.protocol.startsWith('imap')) {
+      const config = getImapConfig(info);
+      try {
+        const conn = await Imap.connect(config);
+        const box = await conn.openBox('INBOX');
+        let searchCriteria = [];
+        if (info.mailSince) {
+          searchCriteria = [["SINCE", new Date(info.mailSince)]];
+        } else {
+          searchCriteria = ["ALL"];
+        }
+        const fetchOptions = {
+          bodies: ["HEADER", "TEXT"],
+          struct: true
+        };
+        const messages = await conn.search(searchCriteria, fetchOptions);
+        const { simpleParser } = require('mailparser');
+        const crypto = require('crypto');
+        const insert = db.prepare('INSERT INTO emails (received_at, subject, body, from_addr, todo_flag, unique_hash, deadline) VALUES (?, ?, ?, ?, ?, ?, ?)');
+        const exists = db.prepare('SELECT COUNT(*) as cnt FROM emails WHERE unique_hash = ?');
+        function extractDeadline(body) {
+          if (!body) return null;
+          const patterns = [
+            /(\d{4})[./-](\d{1,2})[./-](\d{1,2})/,
+            /(\d{1,2})[./-](\d{1,2})/,
+            /(\d{1,2})월\s?(\d{1,2})일/,
+            /(\d{1,2})일/,
+            /(\d{1,2})일까지/
+          ];
+          for (const re of patterns) {
+            const m = body.match(re);
+            if (m) {
+              if (m.length >= 4 && m[1].length === 4) {
+                return `${m[1]}/${m[2].padStart(2,'0')}/${m[3].padStart(2,'0')}`;
+              } else if (m.length >= 3 && re === patterns[1]) {
+                return `${new Date().getFullYear()}/${m[1].padStart(2,'0')}/${m[2].padStart(2,'0')}`;
+              } else if (m.length >= 3 && re === patterns[2]) {
+                return `${new Date().getFullYear()}/${m[1].padStart(2,'0')}/${m[2].padStart(2,'0')}`;
+              } else if (m.length >= 2 && (re === patterns[3] || re === patterns[4])) {
+                return `${new Date().getFullYear()}/${(new Date().getMonth()+1).toString().padStart(2,'0')}/${m[1].padStart(2,'0')}`;
+              }
+            }
+          }
+          const yearMonthDay = body.match(/(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일/);
+          if (yearMonthDay) {
+            return `${yearMonthDay[1]}/${yearMonthDay[2].padStart(2,'0')}/${yearMonthDay[3].padStart(2,'0')}`;
+          }
+          return null;
+        }
+        for (const msg of messages) {
+          try {
+            // HEADER와 TEXT 파트 분리
+            const headerPart = msg.parts.find(p => p.which === 'HEADER');
+            const textPart = msg.parts.find(p => p.which === 'TEXT');
+            // HEADER 파싱
+            let subject = '', from = '', date = '';
+            if (headerPart && headerPart.body) {
+              subject = Array.isArray(headerPart.body.subject) ? headerPart.body.subject[0] : (headerPart.body.subject || '');
+              from = Array.isArray(headerPart.body.from) ? headerPart.body.from[0] : (headerPart.body.from || '');
+              date = Array.isArray(headerPart.body.date) ? headerPart.body.date[0] : (headerPart.body.date || '');
+            }
+            // 본문 파싱: 항상 simpleParser로 html/text 우선순위 저장
+            let body = '';
+            if (textPart && textPart.body) {
+              const { simpleParser } = require('mailparser');
+              try {
+                const parsed = await simpleParser(textPart.body);
+                if (parsed.html) {
+                  body = parsed.html;
+                } else if (parsed.text) {
+                  body = parsed.text;
+                } else {
+                  body = textPart.body.toString();
+                }
+              } catch (e) {
+                body = textPart.body.toString();
+              }
+            }
+            const hash = crypto.createHash('sha256').update((subject||'')+(body||'')+(from||'')+(date||'')).digest('hex');
+            if (!exists.get(hash).cnt) {
+              insert.run(date, subject, body, from, null, hash, extractDeadline(body));
+            }
+          } catch (e) { /* 무시 */ }
+        }
+        return { success: true };
+      } catch (e) {
+        return { success: false, message: e && (e.stack || e.message || JSON.stringify(e)) };
+      }
+    } else {
+      return { success: false, message: '지원하지 않는 프로토콜' };
+    }
+  }
+
+  // 외부에서 직접 호출 가능하도록 export
+  module.exports.syncMail = syncMail;
   // 다양한 타입을 안전하게 Buffer로 변환
   function toBuffer(body) {
     if (Buffer.isBuffer(body)) return body;
@@ -107,27 +204,26 @@ function setupMailIpc(main) {
             // HEADER 파싱
             let subject = '', from = '', date = '';
             if (headerPart && headerPart.body) {
-              // imap-simple은 HEADER를 객체로 반환함
               subject = Array.isArray(headerPart.body.subject) ? headerPart.body.subject[0] : (headerPart.body.subject || '');
               from = Array.isArray(headerPart.body.from) ? headerPart.body.from[0] : (headerPart.body.from || '');
               date = Array.isArray(headerPart.body.date) ? headerPart.body.date[0] : (headerPart.body.date || '');
             }
-            // 본문 파싱
+            // 본문 파싱: 항상 simpleParser로 html/text 우선순위 저장
             let body = '';
             if (textPart && textPart.body) {
-              body = textPart.body;
-            }
-            // fallback: simpleParser로 한 번 더 파싱 (본문이 html일 경우 등)
-            if (!body && textPart) {
               const { simpleParser } = require('mailparser');
               try {
                 const parsed = await simpleParser(textPart.body);
-                body = parsed.text || '';
-                if (!body && parsed.html) {
-                  const { htmlToText } = require('html-to-text');
-                  body = htmlToText(parsed.html, { wordwrap: false });
+                if (parsed.html) {
+                  body = parsed.html;
+                } else if (parsed.text) {
+                  body = parsed.text;
+                } else {
+                  body = textPart.body;
                 }
-              } catch (e) {}
+              } catch (e) {
+                body = textPart.body;
+              }
             }
             // 날짜 ISO 포맷 변환
             let isoDate = '';

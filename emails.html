@@ -5,19 +5,25 @@
   <title>메일 목록</title>
   <link rel="stylesheet" href="style.css">
   <style>
-    body { background: #4ecdc4; }
-    .emails-table { width: 100%; border-collapse: collapse; margin-top: 20px; background: #4ecdc4; }
-    .emails-table th, .emails-table td { border: 1px solid #2e8b82; padding: 8px; font-size: 0.95em; background: #4ecdc4; color: #11443c; }
-    .emails-table th { background: #3bbfa3; color: #fff; }
+        .subject-cell {
+          color: #222;
+          text-decoration: underline;
+          cursor: pointer;
+          background: #fff;
+        }
+    body { background: #618082; }
+    .emails-table { width: 100%; border-collapse: collapse; margin-top: 20px; background: #f0f9f9; }
+    .emails-table th, .emails-table td { border: 1px solid #5b5a5a; padding: 8px; font-size: 0.95em; background: #aefdf7; color: #222; }
+    .emails-table th { background: #e2fef8; color: #636262; }
     .emails-table tr:nth-child(even) { background: #43bfb1; }
-    .emails-table tr:hover { background: #3bbfa3; color: #fff; }
-    .emails-header { font-size: 1.2em; font-weight: bold; margin-top: 10px; color: #11443c; }
+    .emails-table tr:hover { background: #b0f8e9; color: #222; }
+    .emails-header { font-size: 1.2em; font-weight: bold; margin-top: 10px; color: #222; }
     /* 모달용 */
-    #mailModal { background: rgba(78,205,196,0.32)!important; }
-    #mailModalContent { background: #4ecdc4!important; color: #11443c!important; }
-    #closeMailModal { color: #11443c!important; }
-    #mailModalContent h2 { color: #11443c!important; }
-    #mailModalContent pre { background: none; color: #11443c; }
+    #mailModal { background: rgba(213, 228, 227, 0.32)!important; }
+    #mailModalContent { background: #627574!important; color: #222!important; }
+    #closeMailModal { color: #333!important; }
+    #mailModalContent h2 { color: #222!important; }
+    #mailModalContent pre { background: none; color: #222; }
   </style>
 </head>
 <body>
@@ -38,14 +44,14 @@
     </table>
   </div>
   <!-- 메일 본문 모달 -->
-  <div id="mailModal" style="display:none;position:fixed;z-index:9999;left:0;top:0;width:100vw;height:100vh;background:rgba(0,0,0,0.32);align-items:center;justify-content:center;">
-    <div id="mailModalContent" style="background:#fffbe7;padding:32px 28px 24px 28px;border-radius:12px;box-shadow:0 4px 32px #b48a0055;max-width:600px;width:90vw;max-height:80vh;overflow:auto;position:relative;">
-      <button id="closeMailModal" style="position:absolute;top:12px;right:16px;font-size:1.3em;background:none;border:none;color:#b48a00;cursor:pointer;">&times;</button>
-      <h2 id="modalSubject" style="color:#b48a00;margin-top:0;"></h2>
-      <div style="margin-bottom:8px;"><b>From:</b> <span id="modalFrom"></span></div>
-      <div style="margin-bottom:8px;"><b>Date:</b> <span id="modalDate"></span></div>
+  <div id="mailModal" style="display:none;position:fixed;z-index:9999;left:0;top:0;width:100vw;height:100vh;background:rgba(240, 252, 228, 0.32);align-items:center;justify-content:center;">
+    <div id="mailModalContent" style="background:#fff;color:#222;padding:32px 28px 24px 28px;border-radius:12px;box-shadow:0 4px 32px #9bf8a955;max-width:600px;width:90vw;max-height:80vh;overflow:auto;position:relative;">
+      <button id="closeMailModal" style="position:absolute;top:12px;right:16px;font-size:1.3em;background:none;border:none;color:#333;cursor:pointer;">&times;</button>
+      <h2 id="modalSubject" style="color:#222;margin-top:0;"></h2>
+      <div style="margin-bottom:8px;"><b>From:</b> <span id="modalFrom" style="color:#222;"></span></div>
+      <div style="margin-bottom:8px;"><b>Date:</b> <span id="modalDate" style="color:#222;"></span></div>
       <hr/>
-      <pre id="modalBody" style="white-space:pre-wrap;word-break:break-all;background:none;padding:0;margin:0;"></pre>
+      <pre id="modalBody" style="white-space:pre-wrap;word-break:break-all;background:none;padding:0;margin:0;color:#222;"></pre>
     </div>
   </div>
   <script>
@@ -56,7 +62,7 @@
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td>${mail.received_at}</td>
-          <td class="subject-cell" style="cursor:pointer;color:#b48a00;text-decoration:underline;">${mail.subject}</td>
+          <td class="subject-cell">${mail.subject}</td>
           <td>${mail.from_addr}</td>
           <td><input type="checkbox" ${mail.todo_flag ? 'checked' : ''} data-id="${mail.id}" /></td>
         `;
@@ -79,7 +85,35 @@
           document.getElementById('modalSubject').textContent = mail.subject;
           document.getElementById('modalFrom').textContent = mail.from_addr;
           document.getElementById('modalDate').textContent = mail.received_at;
-          document.getElementById('modalBody').innerHTML = mail.body ? mail.body.replace(/</g,'&lt;').replace(/>/g,'&gt;') : '(본문 없음)';
+          // HTML 본문 자동 렌더링 (XSS 방지: 신뢰된 메일만 사용 권장)
+          let body = mail.body || '';
+          // quoted-printable, base64 등 인코딩된 경우 디코딩 시도 (간단 버전)
+          function decodeQP(str) {
+            return str.replace(/=([A-Fa-f0-9]{2})/g, (m, hex) => String.fromCharCode(parseInt(hex,16))).replace(/=\r?\n/g, '');
+          }
+          function isBase64(str) {
+            // base64는 4의 배수 길이, 알파벳/숫자/+/=만 포함
+            return /^[A-Za-z0-9+/=\r\n]+$/.test(str) && str.length > 32 && str.length % 4 === 0;
+          }
+          function decodeBase64(str) {
+            try {
+              // 줄바꿈 제거 후 디코딩
+              return decodeURIComponent(escape(window.atob(str.replace(/\s+/g, ''))));
+            } catch (e) { return str; }
+          }
+          if (/<!DOCTYPE|<html|<body|<table|<div|<span|<p|<br|<img|<a/i.test(body)) {
+            // HTML 본문: 그대로 렌더링
+            document.getElementById('modalBody').innerHTML = body;
+          } else if (/=3D|=20|=09|=0A|=0D/.test(body)) {
+            // quoted-printable 인코딩 추정
+            document.getElementById('modalBody').textContent = decodeQP(body);
+          } else if (isBase64(body)) {
+            // base64 인코딩 추정
+            document.getElementById('modalBody').textContent = decodeBase64(body);
+          } else {
+            // 일반 텍스트: escape
+            document.getElementById('modalBody').textContent = body;
+          }
           document.getElementById('mailModal').style.display = 'flex';
           // ESC로 닫기
           document.onkeydown = function(e) {

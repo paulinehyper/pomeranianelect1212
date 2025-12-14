@@ -212,6 +212,23 @@ function renderList(todos) {
 document.addEventListener('DOMContentLoaded', async () => {
   const todos = await fetchTodos();
   renderList(todos);
+  // 앱 시작 시 메일 설정이 있으면 자동 연동
+  const settings = await window.electronAPI.getMailSettings();
+  if (settings && settings.mail_id && settings.mail_pw && settings.protocol && settings.mail_type) {
+    // DB에서 가장 최근 메일 날짜 조회
+    const latest = await window.electronAPI.getEmails().then(list =>
+      list && list.length > 0 ? list.reduce((a, b) => a.received_at > b.received_at ? a : b).received_at : undefined
+    );
+    const info = {
+      mailType: settings.mail_type,
+      protocol: settings.protocol,
+      mailId: settings.mail_id,
+      mailPw: settings.mail_pw,
+      mailSince: latest,
+      mailServer: settings.mail_server || ''
+    };
+    await window.electronAPI.mailConnect(info);
+  }
 });
 
 // 연동하기 버튼(이메일 연동) 클릭 시 새 메일만 동기화
@@ -236,7 +253,18 @@ syncBtn.addEventListener('click', async () => {
     mailSince: latest
   };
   // 메일 연동(최신 메일 이후만)
-  await window.electronAPI.mailConnect(info);
+  const result = await window.electronAPI.mailConnect(info);
+  // 연동 성공 시 자동 저장
+  if (result && result.success) {
+    await window.electronAPI.saveMailSettings({
+      mailType: info.mailType,
+      protocol: info.protocol,
+      mailId: info.mailId,
+      mailPw: info.mailPw,
+      mailSince: info.mailSince,
+      mailServer: settings.mail_server || ''
+    });
+  }
   // 동기화 후 목록 새로고침
   const todos = await fetchTodos();
   renderList(todos);

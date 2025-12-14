@@ -55,11 +55,12 @@ ipcMain.handle('set-auto-launch', async (event, enable) => {
 // 배포용: mail_settings 초기화 (mail_id, mail_pw, mail_since 비움) 및 자동실행 등록
 app.once('ready', async () => {
   try {
-    // mail_settings 테이블이 있으면 모두 삭제
-    db.prepare('DELETE FROM mail_settings').run();
-    // 빈 값으로 1개 레코드 삽입 (mail_id, mail_pw, mail_since 비움)
-    db.prepare('INSERT INTO mail_settings (mail_type, protocol, mail_id, mail_pw, mail_since) VALUES (?, ?, ?, ?, ?)')
-      .run('naver', 'imap-ssl', '', '', '');
+    // mail_settings 테이블이 비어있을 때만 기본값 삽입
+    const count = db.prepare('SELECT COUNT(*) as cnt FROM mail_settings').get().cnt;
+    if (count === 0) {
+      db.prepare('INSERT INTO mail_settings (mail_type, protocol, mail_id, mail_pw, mail_since) VALUES (?, ?, ?, ?, ?)')
+        .run('naver', 'imap-ssl', '', '', '');
+    }
   } catch (e) {
     // 무시
   }

@@ -264,6 +264,7 @@ body {
   padding: 0;
   background: transparent;
   font-family: 'Segoe UI', 'Malgun Gothic', Arial, sans-serif;
+  color: #d6ff07;
 }
 
 /* 스케쥴 위젯 가로폭 확장 */
@@ -372,7 +373,7 @@ body {
   margin: 0;
   border: none;
 }
-}
+
 .date {
   color: #03af7c;
   font-weight: bold;
