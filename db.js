@@ -1,6 +1,18 @@
+
 const Database = require('better-sqlite3');
 const path = require('path');
-const dbPath = path.join(__dirname, 'todo.db');
+const fs = require('fs');
+
+// 사용자 APPDATA 경로에 DB 저장
+const appName = 'pomeranianelect1212';
+const appDataDir = process.env.APPDATA ||
+  (process.platform === 'darwin' ? path.join(process.env.HOME, 'Library', 'Application Support')
+    : path.join(process.env.HOME || '', '.config'));
+const dbDir = path.join(appDataDir, appName);
+if (!fs.existsSync(dbDir)) {
+  fs.mkdirSync(dbDir, { recursive: true });
+}
+const dbPath = path.join(dbDir, 'todo.db');
 console.log('DB 경로:', dbPath);
 const db = new Database(dbPath);
 
