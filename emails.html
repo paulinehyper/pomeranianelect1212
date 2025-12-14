@@ -5,13 +5,19 @@
   <title>메일 목록</title>
   <link rel="stylesheet" href="style.css">
   <style>
-    body { background: #fffbe7; }
-    .emails-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-    .emails-table th, .emails-table td { border: 1px solid #e1c97a; padding: 8px; font-size: 0.95em; }
-    .emails-table th { background: #ffe9a7; }
-    .emails-table tr:nth-child(even) { background: #fff6d6; }
-    .emails-table tr:hover { background: #ffe9a7; }
-    .emails-header { font-size: 1.2em; font-weight: bold; margin-top: 10px; }
+    body { background: #4ecdc4; }
+    .emails-table { width: 100%; border-collapse: collapse; margin-top: 20px; background: #4ecdc4; }
+    .emails-table th, .emails-table td { border: 1px solid #2e8b82; padding: 8px; font-size: 0.95em; background: #4ecdc4; color: #11443c; }
+    .emails-table th { background: #3bbfa3; color: #fff; }
+    .emails-table tr:nth-child(even) { background: #43bfb1; }
+    .emails-table tr:hover { background: #3bbfa3; color: #fff; }
+    .emails-header { font-size: 1.2em; font-weight: bold; margin-top: 10px; color: #11443c; }
+    /* 모달용 */
+    #mailModal { background: rgba(78,205,196,0.32)!important; }
+    #mailModalContent { background: #4ecdc4!important; color: #11443c!important; }
+    #closeMailModal { color: #11443c!important; }
+    #mailModalContent h2 { color: #11443c!important; }
+    #mailModalContent pre { background: none; color: #11443c; }
   </style>
 </head>
 <body>
