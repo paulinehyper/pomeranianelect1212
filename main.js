@@ -1,4 +1,12 @@
 const { app, BrowserWindow, ipcMain, Tray, Menu } = require('electron');
+const path = require('path');
+
+// OS별 아이콘 경로 분기
+const iconPath =
+  process.platform === 'darwin'
+    ? path.join(__dirname, 'assets', 'icon.png')   // mac
+    : path.join(__dirname, 'icon.ico');            // win
+const winIcon = iconPath;
 
 // 사용자 직접 할일 추가
 ipcMain.handle('insert-todo', (event, { task, deadline, memo }) => {
@@ -22,7 +30,6 @@ ipcMain.handle('set-email-todo-complete', (event, id) => {
   return { success: true };
 });
 let tray = null;
-const path = require('path');
 const db = require('./db');
 const setupMailIpc = require('./mail');
 let mainWindow = null;
@@ -42,7 +49,7 @@ ipcMain.on('open-keyword', () => {
     resizable: false,
     alwaysOnTop: true,
     frame: false, // 커스텀 프레임
-    icon: path.join(__dirname, 'icon.ico'),
+    icon: winIcon,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -145,7 +152,7 @@ ipcMain.on('open-emails', () => {
     resizable: true,
     minimizable: true,
     maximizable: true,
-    icon: path.join(__dirname, 'icon.ico'),
+    icon: winIcon,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -165,7 +172,7 @@ function createWindow() {
     frame: false,
     resizable: true,
     transparent: true,
-    icon: path.join(__dirname, 'icon.ico'),
+    icon: winIcon,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -273,7 +280,7 @@ function createWindow() {
         alwaysOnTop: true,
         frame: false, // 프레임리스
         transparent: true, // 투명 배경
-        icon: path.join(__dirname, 'icon.ico'),
+        icon: winIcon,
         webPreferences: {
           preload: path.join(__dirname, 'preload.js'),
           contextIsolation: true,
@@ -288,7 +295,6 @@ function createWindow() {
 
 app.whenReady().then(() => {
     // 트레이 아이콘 생성
-    const iconPath = path.join(__dirname, 'icon.ico');
     tray = new Tray(iconPath);
     tray.setToolTip('할일 위젯');
     tray.setContextMenu(Menu.buildFromTemplate([
