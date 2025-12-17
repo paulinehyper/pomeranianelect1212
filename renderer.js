@@ -211,6 +211,10 @@ function renderList(todos) {
         // 제외 후 목록 새로고침
         const todos = await fetchTodos();
         renderList(todos);
+        // 메일 목록도 새로고침 (openEmails은 emails.html 창을 포커싱/오픈)
+        if (window.electronAPI.openEmails) {
+          window.electronAPI.openEmails();
+        }
       }
     });
     list.appendChild(li);

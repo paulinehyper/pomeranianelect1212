@@ -107,7 +107,11 @@ ipcMain.handle('exclude-todo', (event, id) => {
     let negativeSample = '';
     if (todo && todo.unique_hash) {
       // emails에서 subject/body 찾기
-      const mail = db.prepare('SELECT subject, body FROM emails WHERE unique_hash=?').get(todo.unique_hash);
+      const mail = db.prepare('SELECT subject, body, id FROM emails WHERE unique_hash=?').get(todo.unique_hash);
+      // 메일 기반 할일이면 emails 테이블의 todo_flag도 0으로 변경
+      if (mail && mail.id) {
+        db.prepare('UPDATE emails SET todo_flag=0 WHERE id=?').run(mail.id);
+      }
       if (mail) {
         const fs = require('fs');
         const lines = fs.readFileSync('todo_train_data.txt', 'utf-8').split('\n');
