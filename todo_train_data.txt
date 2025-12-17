@@ -18641,3 +18641,18 @@ ml>
 
 
 --b1_0e8e97a2990c530ffae794cce888419c--
+__NEG__ (광고)[📢설문Event] 얼굴/홍채 인식, 여러분의 생각은 ?(~12/19 16:00) 
+<center><table width="740" border="0" cellspacing="0" cellpadding="0" align="center" style=" border:1px solid #d8d8d8;background-color:#f4f4f4;">
+	        <tbody><tr>
+<th><IMG
+ BORDER="0" STYLE="display:block;" SRC="https://www.boannews.com/images/newsletter/250306_face_img1.jpg"></th></tr>
+	  	        <tr>
+<th><A TARGET="_blank"HREF="https://s002.sendmail05.com:443/detect/click?mailtype=email&campaignidx=4078&duplicationyn=N&targetidx=68483&encoding=yes&maillink=false&email=rhvhffls%40naver.com&csvimportIdxForeign=68483&url=https%3A%2F%2Fnaver.me%2FFSS4rVlg&campaignclickobjectidx=140151&type=click"><IMG
+ BORDER="0" STYLE="display:block;" SRC="https://www.boannews.com/images/newsletter/250306_face_img2.jpg"></A></th></tr>
+	  	        <tr>
+<th><IMG
+ BORDER="0" STYLE="display:block;" SRC="https://www.boannews.com/images/newsletter/250306_face_img3.jpg"></th></tr>
+
+  </tbody></table>
+</center>
+<img src='https://s002.sendmail05.com:443/detect/open?mailtype=email&campaignidx=4078&email=rhvhffls@naver.com&csvimportIdxForeign=68483&responseend=2025-12-24' width=0 height=0 onError='this.style.visibility=hidden'>
