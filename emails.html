@@ -56,6 +56,11 @@
   </div>
   <script>
     function renderEmails(emails) {
+      // todo_flag가 1(체크된) 메일을 먼저, 0(미체크)은 뒤로 정렬
+      emails = [...emails].sort((a, b) => {
+        if (a.todo_flag === b.todo_flag) return 0;
+        return a.todo_flag ? -1 : 1;
+      });
       // 전체선택 체크박스 상태 동기화 (모든 메일이 체크되어 있으면 전체선택도 체크)
       setTimeout(() => {
         const allCbs = document.querySelectorAll('#emailsTable tbody input[type="checkbox"]');
