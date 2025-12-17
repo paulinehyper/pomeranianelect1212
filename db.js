@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS autoplay (
   enabled INTEGER DEFAULT 0
 );
 INSERT OR IGNORE INTO autoplay (id, enabled) VALUES (1, 0);
+
 CREATE TABLE IF NOT EXISTS emails (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   received_at TEXT NOT NULL,
@@ -39,7 +40,7 @@ CREATE TABLE IF NOT EXISTS emails (
   from_addr TEXT NOT NULL,
   todo_flag INTEGER DEFAULT 0,
   unique_hash TEXT,
-  deadline TEXT, -- 마감일(YYYY/MM/DD 등)
+  deadline TEXT,
   memo TEXT DEFAULT ''
 );
 
@@ -51,6 +52,7 @@ CREATE TABLE IF NOT EXISTS mail_settings (
   mail_pw TEXT,
   mail_since TEXT,
   mail_server TEXT,
+  host TEXT,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -59,13 +61,9 @@ CREATE TABLE IF NOT EXISTS keyword (
   keyword TEXT NOT NULL UNIQUE,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
+
 `);
 
-
-// Keyword 삽입 함수
-db.insertKeyword = function(keyword) {
-  return db.prepare('INSERT OR IGNORE INTO keyword (keyword) VALUES (?)').run(keyword);
-};
 // Keyword 전체 조회 함수
 db.getAllKeywords = function() {
   return db.prepare('SELECT keyword FROM keyword ORDER BY id DESC').all().map(row => row.keyword);
@@ -78,7 +76,6 @@ db.updateKeyword = function(oldKw, newKw) {
 db.deleteKeyword = function(kw) {
   return db.prepare('DELETE FROM keyword WHERE keyword = ?').run(kw);
 };
-
 
 // todos 테이블에 할일을 저장하는 함수 (deadline 컬럼 포함)
 // 사용 예: db.insertTodo({ date: '2025-12-13', dday: 'D-1', task: '할일', memo: '메모', deadline: '2025-12-13' })
@@ -105,6 +102,19 @@ const emailsPragma = db.prepare("PRAGMA table_info(emails)").all();
 const emailsHasDeadline = emailsPragma.some(col => col.name === 'deadline');
 if (!emailsHasDeadline) {
   db.exec('ALTER TABLE emails ADD COLUMN deadline TEXT');
+}
+
+// Migration: add unique_hash column to emails if missing
+const emailsHasUniqueHash = emailsPragma.some(col => col.name === 'unique_hash');
+if (!emailsHasUniqueHash) {
+  db.exec('ALTER TABLE emails ADD COLUMN unique_hash TEXT');
+}
+
+// Migration: add host column to mail_settings if missing
+const mailSettingsPragma = db.prepare("PRAGMA table_info(mail_settings)").all();
+const mailSettingsHasHost = mailSettingsPragma.some(col => col.name === 'host');
+if (!mailSettingsHasHost) {
+  db.exec('ALTER TABLE mail_settings ADD COLUMN host TEXT');
 }
 
 module.exports = db;

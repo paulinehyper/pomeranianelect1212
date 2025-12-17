@@ -180,59 +180,72 @@
       };
     }
 
+    const connectBtn = document.querySelector('.connect-btn[type="submit"]');
+    let isSyncing = false;
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      syncStatus.textContent = '연동 중...';
-      syncStatus.style.color = '#e67e22';
-      const mailType = document.getElementById('mailType').value;
-      const protocol = document.getElementById('protocol').value;
-      const mailId = document.getElementById('mailId').value;
-      const mailPw = document.getElementById('mailPw').value;
-      const mailSince = document.getElementById('mailSince').value;
-      const host = document.getElementById('host').value;
-      const info = { mailType, protocol, mailId, mailPw, mailSince, host };
-      await window.electronAPI.saveMailSettings(info);
-      try {
-        const result = await window.electronAPI.mailConnect(info);
-        // Hide raw error for app password required
-        if(result.message && result.message.includes('Application-specific password required')) {
-          syncStatus.textContent = '';
-          showAppPasswordModal();
-        } else if(result.message && (result.message.includes('Invalid credentials') || result.message.includes('Authentication failed'))) {
-          syncStatus.textContent = '';
-          showInvalidCredsModal();
-        } else if(result.message && result.message.includes('ECONNREFUSED')) {
-          syncStatus.textContent = '';
-          showPop3ConnRefusedModal();
-        } else {
-          syncStatus.textContent = result.message;
-          syncStatus.style.color = result.success ? '#27ae60' : '#e74c3c';
-          if(result.success) {
-            viewEmailsBtn.style.opacity = 1;
-            viewEmailsBtn.style.pointerEvents = 'auto';
+      if (!isSyncing) {
+        // 연동 시작
+        isSyncing = true;
+        connectBtn.textContent = '연동중지';
+        syncStatus.textContent = '연동 중...';
+        syncStatus.style.color = '#e67e22';
+        await window.electronAPI.startMailSync();
+        const mailType = document.getElementById('mailType').value;
+        const protocol = document.getElementById('protocol').value;
+        const mailId = document.getElementById('mailId').value;
+        const mailPw = document.getElementById('mailPw').value;
+        const mailSince = document.getElementById('mailSince').value;
+        const host = document.getElementById('host').value;
+        const info = { mailType, protocol, mailId, mailPw, mailSince, host };
+        await window.electronAPI.saveMailSettings(info);
+        try {
+          const result = await window.electronAPI.mailConnect(info);
+          if(result.message && result.message.includes('Application-specific password required')) {
+            syncStatus.textContent = '';
+            showAppPasswordModal();
+          } else if(result.message && (result.message.includes('Invalid credentials') || result.message.includes('Authentication failed'))) {
+            syncStatus.textContent = '';
+            showInvalidCredsModal();
+          } else if(result.message && result.message.includes('ECONNREFUSED')) {
+            syncStatus.textContent = '';
+            showPop3ConnRefusedModal();
+          } else {
+            syncStatus.textContent = result.message;
+            syncStatus.style.color = result.success ? '#27ae60' : '#e74c3c';
+            if(result.success) {
+              viewEmailsBtn.style.opacity = 1;
+              viewEmailsBtn.style.pointerEvents = 'auto';
+            }
+            if(result.message && result.message.includes('Unable to login')) {
+              alert('이메일 연동을 해주세요.\n(메일 계정/비밀번호/설정 확인 필요)');
+            }
           }
-          if(result.message && result.message.includes('Unable to login')) {
-            alert('이메일 연동을 해주세요.\n(메일 계정/비밀번호/설정 확인 필요)');
+        } catch (err) {
+          if(err && err.message && err.message.includes('Application-specific password required')) {
+            syncStatus.textContent = '';
+            showAppPasswordModal();
+          } else if(err && err.message && (err.message.includes('Invalid credentials') || err.message.includes('Authentication failed'))) {
+            syncStatus.textContent = '';
+            showInvalidCredsModal();
+          } else if(err && err.message && err.message.includes('ECONNREFUSED')) {
+            syncStatus.textContent = '';
+            showPop3ConnRefusedModal();
+          } else {
+            syncStatus.textContent = '연동실패: ' + err.message;
+            syncStatus.style.color = '#e74c3c';
+            if(err && err.message && err.message.includes('Unable to login')) {
+              alert('이메일 연동을 해주세요.\n(메일 계정/비밀번호/설정 확인 필요)');
+            }
           }
         }
-      } catch (err) {
-        // Hide raw error for app password required
-        if(err && err.message && err.message.includes('Application-specific password required')) {
-          syncStatus.textContent = '';
-          showAppPasswordModal();
-        } else if(err && err.message && (err.message.includes('Invalid credentials') || err.message.includes('Authentication failed'))) {
-          syncStatus.textContent = '';
-          showInvalidCredsModal();
-        } else if(err && err.message && err.message.includes('ECONNREFUSED')) {
-          syncStatus.textContent = '';
-          showPop3ConnRefusedModal();
-        } else {
-          syncStatus.textContent = '연동실패: ' + err.message;
-          syncStatus.style.color = '#e74c3c';
-          if(err && err.message && err.message.includes('Unable to login')) {
-            alert('이메일 연동을 해주세요.\n(메일 계정/비밀번호/설정 확인 필요)');
-          }
-        }
+      } else {
+        // 연동 중지
+        isSyncing = false;
+        connectBtn.textContent = '연동하기';
+        syncStatus.textContent = '연동이 중지되었습니다.';
+        syncStatus.style.color = '#888';
+        await window.electronAPI.stopMailSync();
       }
     });
     viewEmailsBtn.addEventListener('click', () => {

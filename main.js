@@ -237,9 +237,9 @@ ipcMain.handle('save-memo', (event, id, memo) => {
 });
 
 ipcMain.handle('save-mail-settings', (event, settings) => {
-  // Save mail_server as well
-  const stmt = db.prepare(`INSERT INTO mail_settings (mail_type, protocol, mail_id, mail_pw, mail_since, mail_server) VALUES (?, ?, ?, ?, ?, ?)`);
-  stmt.run(settings.mailType, settings.protocol, settings.mailId, settings.mailPw, settings.mailSince, settings.mailServer);
+  // Save mail_server and host as well
+  const stmt = db.prepare(`INSERT INTO mail_settings (mail_type, protocol, mail_id, mail_pw, mail_since, mail_server, host) VALUES (?, ?, ?, ?, ?, ?, ?)`);
+  stmt.run(settings.mailType, settings.protocol, settings.mailId, settings.mailPw, settings.mailSince, settings.mailServer, settings.host);
   return { success: true };
 });
 
@@ -494,31 +494,44 @@ app.whenReady().then(() => {
   const { ipcMain } = require('electron');
   // const db = require('./db');
   const { BrowserWindow } = require('electron');
+  let syncMailInterval = null;
   const syncMail = async () => {
-    // 최신 메일 설정 가져오기
     const row = db.prepare('SELECT * FROM mail_settings ORDER BY id DESC LIMIT 1').get();
     if (row && row.mail_id && row.mail_pw && row.protocol && row.mail_type) {
-      // mail-connect IPC 핸들러 직접 호출
       const mailModule = require('./mail');
-      // mail.js의 setupMailIpc에서 ipcMain.handle로 등록된 핸들러를 직접 실행
-      // (ipcMain.handle은 렌더러에서만 호출 가능하므로, mail.js의 내부 함수를 별도로 export하는 것이 더 안전)
-      // 여기서는 ipcMain.invoke 대신 mailModule.syncMail(row) 형태로 구현 권장
-          if (typeof mailModule.syncMail === 'function') {
-            // Ensure mail_server is included in row (for custom server)
-            await mailModule.syncMail({ ...row, mail_server: row.mail_server });
+      if (typeof mailModule.syncMail === 'function') {
+        await mailModule.syncMail({ ...row, mail_server: row.mail_server });
       } else {
-        // fallback: BrowserWindow에서 mail-connect IPC 호출
         const win = BrowserWindow.getAllWindows()[0];
         if (win) {
-              // Pass mail_server as well
-              win.webContents.send('mail-connect', { ...row, mail_server: row.mail_server });
+          win.webContents.send('mail-connect', { ...row, mail_server: row.mail_server });
         }
       }
     }
   };
-  setInterval(syncMail, 60 * 1000); // 1분마다 실행
-  // 앱 시작 직후에도 1회 실행
-  syncMail();
+  function startMailSync() {
+    if (syncMailInterval) clearInterval(syncMailInterval);
+    syncMailInterval = setInterval(syncMail, 60 * 1000);
+    syncMail(); // 앱 시작 직후 1회 실행
+  }
+  function stopMailSync() {
+    if (syncMailInterval) {
+      clearInterval(syncMailInterval);
+      syncMailInterval = null;
+    }
+  }
+  // 앱 시작 시 자동 연동
+  startMailSync();
+
+  // IPC로 연동 시작/중지 제어
+  ipcMain.handle('start-mail-sync', () => {
+    startMailSync();
+    return { success: true };
+  });
+  ipcMain.handle('stop-mail-sync', () => {
+    stopMailSync();
+    return { success: true };
+  });
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });

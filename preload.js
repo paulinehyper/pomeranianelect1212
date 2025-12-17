@@ -24,5 +24,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openAppSettings: () => ipcRenderer.send('open-app-settings'),
   getAutoLaunch: () => ipcRenderer.invoke('get-auto-launch'),
   setAutoLaunch: (enable) => ipcRenderer.invoke('set-auto-launch', enable),
-  deleteAllTodos: () => ipcRenderer.invoke('delete-all-todos')
+  deleteAllTodos: () => ipcRenderer.invoke('delete-all-todos'),
+  startMailSync: () => ipcRenderer.invoke('start-mail-sync'),
+  stopMailSync: () => ipcRenderer.invoke('stop-mail-sync')
 });
