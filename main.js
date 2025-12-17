@@ -3,6 +3,16 @@ const { app, BrowserWindow, ipcMain, Tray, Menu } = require('electron');
 const path = require('path');
 const autoLauncher = require('./auto-launch');
 
+// 새로고침 시 이메일 todo를 todos에 추가
+ipcMain.handle('refresh-todos-from-emails', () => {
+  try {
+    addTodosFromEmailTodos();
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+});
+
 // 전체 할일 삭제
 ipcMain.handle('delete-all-todos', () => {
   db.prepare('DELETE FROM todos').run();

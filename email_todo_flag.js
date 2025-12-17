@@ -26,13 +26,21 @@ if (require.main === module) {
 module.exports = markTodoEmails;
 
 // emails 테이블에서 todo_flag=1인 이메일을 todos 테이블에 할일로 추가
+
 function addTodosFromEmailTodos() {
+  // 1. email.todo_flag=0인 메일 기반 todos를 삭제
+  const emailsToRemove = db.prepare('SELECT subject FROM emails WHERE todo_flag = 0').all();
+  const deleteTodo = db.prepare('DELETE FROM todos WHERE task = ? AND todo_flag = 1');
+  for (const mail of emailsToRemove) {
+    deleteTodo.run(mail.subject);
+  }
+
+  // 2. email.todo_flag=1인 메일을 todos에 추가 (중복 방지)
   const emails = db.prepare('SELECT id, subject, body, deadline FROM emails WHERE todo_flag = 1').all();
   const insertTodo = db.prepare('INSERT INTO todos (date, dday, task, memo, deadline, todo_flag) VALUES (?, ?, ?, ?, ?, 1)');
   const now = new Date();
   const today = now.toISOString().slice(0, 10); // YYYY-MM-DD
   for (const mail of emails) {
-    // 이미 같은 제목의 할일이 있으면 중복 추가 방지
     const exists = db.prepare('SELECT COUNT(*) as cnt FROM todos WHERE task = ? AND todo_flag = 1').get(mail.subject).cnt;
     if (exists === 0) {
       insertTodo.run(

@@ -294,6 +294,10 @@ refreshBtn.style.marginRight = '8px';
 refreshBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M17.65 6.35A8 8 0 1 0 20 12" stroke="#00b48a" stroke-width="2" fill="none" stroke-linecap="round"/><polyline points="20,4 20,8 16,8" stroke="#00b48a" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 headerRight.insertBefore(refreshBtn, headerRight.firstChild);
 refreshBtn.addEventListener('click', async () => {
+  // 이메일 todo를 todos에 반영
+  if (window.electronAPI.refreshTodosFromEmails) {
+    await window.electronAPI.refreshTodosFromEmails();
+  }
   const todos = await fetchTodos();
   renderList(todos);
 });
