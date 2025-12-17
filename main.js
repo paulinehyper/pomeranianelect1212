@@ -33,6 +33,7 @@ ipcMain.on('open-app-settings', () => {
     minimizable: false,
     maximizable: false,
     alwaysOnTop: true,
+    frame: false, // 커스텀 프레임 적용
     title: '환경설정',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),

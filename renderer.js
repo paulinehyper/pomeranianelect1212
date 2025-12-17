@@ -219,7 +219,8 @@ function renderList(todos) {
     });
     // 제외 버튼 클릭 시 확인창 후 제외 처리
     excludeBtn.addEventListener('click', async () => {
-      if (confirm('할일 목록에서 제외하시겠습니까?')) {
+      const confirmed = await showCustomConfirm('할일 목록에서 제외하시겠습니까?');
+      if (confirmed) {
         if (typeof item.id === 'string' && item.id.startsWith('mail-')) {
           await window.electronAPI.setEmailTodoFlag(item.id.replace('mail-', ''), 0);
         } else {
@@ -234,6 +235,51 @@ function renderList(todos) {
         }
       }
     });
+    // assets/icon.png 이미지를 사용하는 커스텀 confirm 모달 함수
+    function showCustomConfirm(message) {
+      return new Promise((resolve) => {
+        // 기존 모달이 있으면 제거
+        const oldModal = document.getElementById('custom-confirm-modal');
+        if (oldModal) oldModal.remove();
+        const modal = document.createElement('div');
+        modal.id = 'custom-confirm-modal';
+        modal.style.position = 'fixed';
+        modal.style.top = '0';
+        modal.style.left = '0';
+        modal.style.width = '100vw';
+        modal.style.height = '100vh';
+        modal.style.background = 'rgba(0,0,0,0.25)';
+        modal.style.display = 'flex';
+        modal.style.alignItems = 'center';
+        modal.style.justifyContent = 'center';
+        modal.style.zIndex = '9999';
+        modal.innerHTML = `
+          <div style="background:#fff;padding:32px 36px;border-radius:14px;min-width:280px;max-width:90vw;box-shadow:0 4px 24px #00b49c22;display:flex;flex-direction:column;align-items:center;gap:18px;">
+            <img src="assets/icon.png" alt="icon" style="width:48px;height:48px;margin-bottom:8px;" />
+            <div style="font-size:1.1em;color:#222;text-align:center;margin-bottom:12px;">${message}</div>
+            <div style="display:flex;gap:18px;justify-content:center;">
+              <button id="custom-confirm-ok" style="background:#00b49f;color:#fff;border:none;padding:8px 24px;border-radius:6px;font-weight:bold;font-size:1em;cursor:pointer;">확인</button>
+              <button id="custom-confirm-cancel" style="background:#eee;color:#333;border:none;padding:8px 24px;border-radius:6px;font-weight:bold;font-size:1em;cursor:pointer;">취소</button>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(modal);
+        document.getElementById('custom-confirm-ok').onclick = () => {
+          modal.remove();
+          resolve(true);
+        };
+        document.getElementById('custom-confirm-cancel').onclick = () => {
+          modal.remove();
+          resolve(false);
+        };
+        modal.addEventListener('click', (e) => {
+          if (e.target === modal) {
+            modal.remove();
+            resolve(false);
+          }
+        });
+      });
+    }
     list.appendChild(li);
   });
 }

@@ -16,7 +16,11 @@
 </head>
 <body>
   <div class="settings-wrap">
-    <div class="settings-title">환경설정</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <span style="font-size:1.15em;font-weight:bold;color:#00b49c;">환경설정</span>
+      <button id="custom-close-btn" style="background:none;border:none;font-size:1.5em;color:#028b6b;cursor:pointer;line-height:1;">×</button>
+    </div>
+    <!-- <div class="settings-title">환경설정</div> -->
     <div class="form-row">
       <label for="autoLaunchChk">시작 시 자동실행</label>
       <input type="checkbox" id="autoLaunchChk" />
@@ -27,6 +31,8 @@
     </div>
   </div>
   <script>
+    // 커스텀 닫기 버튼 동작
+    document.getElementById('custom-close-btn').onclick = () => window.close();
     let lastChecked = false;
     window.electronAPI.getAutoLaunch().then(enabled => {
       document.getElementById('autoLaunchChk').checked = !!enabled;
