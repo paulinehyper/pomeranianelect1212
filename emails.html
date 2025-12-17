@@ -154,15 +154,16 @@
       if (checkAll) {
         checkAll.onchange = async function() {
           const allCbs = document.querySelectorAll('#emailsTable tbody input[type="checkbox"]');
-          for (const cb of allCbs) {
-            if (cb.checked !== checkAll.checked) {
-              cb.checked = checkAll.checked;
-              const id = cb.getAttribute('data-id');
-              const flag = cb.checked ? 1 : 0;
-              await window.electronAPI.setEmailTodoFlag(id, flag);
-            }
-          }
-          // 최신 목록 다시 렌더링
+          // 1. 체크박스 상태를 먼저 일괄 변경 (즉시 UI 반영)
+          allCbs.forEach(cb => { cb.checked = checkAll.checked; });
+          // 2. setEmailTodoFlag를 Promise.all로 병렬 처리
+          const promises = Array.from(allCbs).map(cb => {
+            const id = cb.getAttribute('data-id');
+            const flag = cb.checked ? 1 : 0;
+            return window.electronAPI.setEmailTodoFlag(id, flag);
+          });
+          await Promise.all(promises);
+          // 3. 모든 처리 후 한 번만 새로고침
           const emails = await window.electronAPI.getEmails();
           renderEmails(emails);
         };
