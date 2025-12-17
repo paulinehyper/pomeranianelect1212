@@ -81,6 +81,15 @@ async function fetchTodos() {
 }
 
 function renderList(todos) {
+    // 헤더의 할일 개수 뱃지 갱신 (완료된 할일 제외)
+    const badge = document.getElementById('todo-count-badge');
+    if (badge) {
+      const notCompleted = todos ? todos.filter(t => {
+        // 이메일 기반: todo_flag === 2가 완료, 일반: style로만 취소선(아래에서 처리)
+        return !(typeof t.id === 'string' && t.id.startsWith('mail-') ? t.todo_flag === 2 : false);
+      }) : [];
+      badge.textContent = notCompleted.length;
+    }
   const list = document.querySelector('.schedule-list');
   list.innerHTML = '';
   if (!todos || todos.length === 0) {
@@ -170,20 +179,28 @@ function renderList(todos) {
       <textarea class="memo" placeholder="메모/부연설명" rows="2" style="display:none;">${memo}</textarea>
     `;
     if (isUrgent) li.classList.add('urgent-blink');
-        // 더블클릭 시 취소선 토글 및 완료 처리
+        // 할일 제목 클릭 시 취소선 토글
         const taskSpan = li.querySelector('.task');
-        if (taskSpan && !isCompleted) {
-          taskSpan.addEventListener('dblclick', async () => {
-            // 이메일 기반 todo만 완료 처리 (id가 mail-로 시작)
-            if (typeof item.id === 'string' && item.id.startsWith('mail-')) {
-              await window.electronAPI.setEmailTodoComplete(item.id.replace('mail-', ''));
+        if (taskSpan) {
+          taskSpan.addEventListener('click', (e) => {
+            let isNowCompleted = false;
+            if (taskSpan.style.textDecoration === 'line-through') {
+              taskSpan.style.textDecoration = '';
+              taskSpan.style.color = '';
+              isNowCompleted = false;
+            } else {
+              taskSpan.style.textDecoration = 'line-through';
+              taskSpan.style.color = '#aaa';
+              isNowCompleted = true;
             }
-            // 취소선 토글(즉시 반영)
-            taskSpan.style.textDecoration = 'line-through';
-            taskSpan.style.color = '#01fad0ff';
-            // 목록 새로고침
-            const todos = await fetchTodos();
-            renderList(todos);
+            // 뱃지 숫자 갱신 (완료시 -1, 취소시 +1)
+            const badge = document.getElementById('todo-count-badge');
+            if (badge) {
+              let current = parseInt(badge.textContent, 10) || 0;
+              if (isNowCompleted && current > 0) badge.textContent = current - 1;
+              if (!isNowCompleted) badge.textContent = current + 1;
+            }
+            e.stopPropagation();
           });
         }
     const editBtn = li.querySelector('.memo-edit-btn');
