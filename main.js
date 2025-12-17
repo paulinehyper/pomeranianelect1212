@@ -30,6 +30,7 @@ ipcMain.on('open-app-settings', () => {
 
 // 자동실행 상태 조회/변경 IPC
 const db = require('./db');
+const { addTodosFromEmailTodos } = require('./email_todo_flag');
 ipcMain.handle('get-auto-launch', async () => {
   try {
     const row = db.prepare('SELECT enabled FROM autoplay WHERE id=1').get();
@@ -54,6 +55,12 @@ ipcMain.handle('set-auto-launch', async (event, enable) => {
 
 // 배포용: mail_settings 초기화 (mail_id, mail_pw, mail_since 비움) 및 자동실행 등록
 app.once('ready', async () => {
+  // 이메일 todo를 todos에 자동 추가
+  try {
+    addTodosFromEmailTodos();
+  } catch (e) {
+    console.error('이메일 todo를 todos에 추가하는 중 오류:', e);
+  }
   try {
     // mail_settings 테이블이 비어있을 때만 기본값 삽입
     const count = db.prepare('SELECT COUNT(*) as cnt FROM mail_settings').get().cnt;
