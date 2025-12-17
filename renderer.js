@@ -154,7 +154,7 @@ function renderList(todos) {
       <span style="display:inline-block;width:8px;"></span>
       <span class="d-day">${item.dday}</span>
       <span style="display:inline-block;width:8px;"></span>
-      <span class="task" style="${isCompleted ? 'text-decoration:line-through;color:#aaa;' : ''}">${item.task}</span>
+      <span class="task" style="${item.todo_flag === 2 ? 'text-decoration:line-through;color:#aaa;' : ''}">${item.task}</span>
       <button class="memo-edit-btn" title="메모 추가/수정" style="background:transparent;border:none;cursor:pointer;margin-left:8px;">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <rect x="3" y="3" width="18" height="18" rx="3" fill="#7affcaff" stroke="#00b49cff" stroke-width="1.5"/>
@@ -296,7 +296,7 @@ refreshBtn.className = 'refresh-btn';
 refreshBtn.title = '새로고침';
 refreshBtn.style.marginRight = '8px';
 refreshBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M17.65 6.35A8 8 0 1 0 20 12" stroke="#00b48a" stroke-width="2" fill="none" stroke-linecap="round"/><polyline points="20,4 20,8 16,8" stroke="#00b48a" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-headerRight.insertBefore(refreshBtn, headerRight.firstChild);
+//headerRight.insertBefore(refreshBtn, headerRight.firstChild);
 refreshBtn.addEventListener('click', async () => {
   // 이메일 todo를 todos에 반영
   if (window.electronAPI.refreshTodosFromEmails) {
@@ -310,7 +310,12 @@ const deleteAllBtn = document.createElement('button');
 deleteAllBtn.className = 'delete-all-btn';
 deleteAllBtn.title = '전체 할일 삭제';
 deleteAllBtn.style.marginRight = '8px';
-deleteAllBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="16" height="16" rx="3" fill="#ffe0e0" stroke="#e00" stroke-width="1.5"/><path d="M8 12h8" stroke="#e00" stroke-width="2"/></svg>`;
+deleteAllBtn.style.background = 'none';
+deleteAllBtn.style.border = 'none';
+deleteAllBtn.style.boxShadow = 'none';
+deleteAllBtn.style.padding = '0';
+deleteAllBtn.style.outline = 'none';
+deleteAllBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="16" height="16" rx="3" fill="none" stroke="rgba(9, 100, 77, 1)" stroke-width="2"/><path d="M8 12h8" stroke="rgba(6, 145, 115, 1)" stroke-width="2"/></svg>`;
 headerRight.insertBefore(deleteAllBtn, headerRight.firstChild);
 deleteAllBtn.addEventListener('click', async () => {
   if (confirm('정말 전체 할일을 삭제하시겠습니까?')) {
