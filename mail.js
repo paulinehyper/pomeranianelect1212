@@ -2,17 +2,20 @@ const { ipcMain } = require('electron');
 const Imap = require('imap-simple');
 const db = require('./db');
 
-function getImapConfig({ mailType, protocol, mailId, mailPw, mail_server }) {
-  let host, port, tls;
-  // Use user-provided mail_server if present, otherwise fallback to default
-  if (mail_server && mail_server.trim()) {
-    host = mail_server.trim();
-  } else if (mailType === 'naver') {
-    host = 'imap.naver.com';
-  } else if (mailType === 'gmail') {
-    host = 'imap.gmail.com';
+function getImapConfig({ mailType, protocol, mailId, mailPw, mail_server, mailServer, host }) {
+  let resolvedHost = '';
+  let port, tls;
+  if (host && host.trim()) {
+    resolvedHost = host.trim();
+  } else if (mail_server && mail_server.trim()) {
+    resolvedHost = mail_server.trim();
+  } else if (mailServer && mailServer.trim()) {
+    resolvedHost = mailServer.trim();
   } else {
-    host = '';
+    resolvedHost = '';
+  }
+  if (!resolvedHost) {
+    throw new Error('IMAP 서버 주소(host)를 입력해야 합니다.');
   }
   if (protocol === 'imap-ssl') {
     port = 993; tls = true;
@@ -23,16 +26,15 @@ function getImapConfig({ mailType, protocol, mailId, mailPw, mail_server }) {
   } else if (protocol === 'pop3') {
     port = 110; tls = false;
   }
-  // 네이버도 반드시 전체 이메일 주소를 입력하도록 변경
   return {
     imap: {
-      user: mailId, // mailId는 반드시 전체 이메일 주소여야 함
+      user: mailId,
       password: mailPw,
-      host,
+      host: resolvedHost,
       port,
       tls,
       authTimeout: 5000,
-      tlsOptions: { rejectUnauthorized: false } // Allow self-signed certs (dev/test only)
+      tlsOptions: { rejectUnauthorized: false }
     }
   };
 }

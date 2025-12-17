@@ -45,8 +45,8 @@
         </select>
       </div>
       <div class="form-row">
-        <label for="mailServer">메일 서버</label>
-        <input type="text" id="mailServer" class="short-input" placeholder="예: imap.naver.com" autocomplete="off" />
+        <label for="host">호스트(Host)</label>
+        <input type="text" id="host" class="short-input" placeholder="예: imap.example.com" autocomplete="off" />
       </div>
       <div class="form-row">
         <label>아이디</label>
@@ -126,26 +126,7 @@
                   };
                 }
             // 메일 종류/연동 방식에 따라 메일 서버 자동 입력
-            const mailTypeEl = document.getElementById('mailType');
-            const protocolEl = document.getElementById('protocol');
-            const mailServerEl = document.getElementById('mailServer');
-            function updateMailServer() {
-              const mailType = mailTypeEl.value;
-              const protocol = protocolEl.value;
-              let server = '';
-              if (protocol.startsWith('imap')) {
-                if (mailType === 'naver') server = 'imap.naver.com';
-                else if (mailType === 'gmail') server = 'imap.gmail.com';
-              } else if (protocol.startsWith('pop3')) {
-                if (mailType === 'naver') server = 'pop.naver.com';
-                else if (mailType === 'gmail') server = 'pop.gmail.com';
-              }
-              if (server) mailServerEl.value = server;
-            }
-            mailTypeEl.addEventListener('change', updateMailServer);
-            protocolEl.addEventListener('change', updateMailServer);
-            // 최초 로딩 시에도 적용
-            updateMailServer();
+            // 메일 서버 자동입력/자동완성 기능 제거 (host 입력란만 사용)
         // ...기존 코드 유지 (자동실행 관련 코드 제거)
     document.getElementById('close-settings-modal').onclick = () => {
       window.close();
@@ -162,9 +143,7 @@
         document.getElementById('mailId').value = settings.mail_id || '';
         document.getElementById('mailPw').value = settings.mail_pw || '';
         document.getElementById('mailSince').value = settings.mail_since || '';
-        // 메일 서버 값이 있으면 세팅, 없으면 자동
-        if (settings.mail_server) mailServerEl.value = settings.mail_server;
-        else updateMailServer();
+        document.getElementById('host').value = settings.host || '';
         viewEmailsBtn.style.opacity = 1;
         viewEmailsBtn.style.pointerEvents = 'auto';
       }
@@ -210,10 +189,11 @@
       const mailId = document.getElementById('mailId').value;
       const mailPw = document.getElementById('mailPw').value;
       const mailSince = document.getElementById('mailSince').value;
-      const mailServer = mailServerEl.value;
-      await window.electronAPI.saveMailSettings({ mailType, protocol, mailId, mailPw, mailSince, mailServer });
+      const host = document.getElementById('host').value;
+      const info = { mailType, protocol, mailId, mailPw, mailSince, host };
+      await window.electronAPI.saveMailSettings(info);
       try {
-        const result = await window.electronAPI.mailConnect({ mailType, protocol, mailId, mailPw, mailSince });
+        const result = await window.electronAPI.mailConnect(info);
         // Hide raw error for app password required
         if(result.message && result.message.includes('Application-specific password required')) {
           syncStatus.textContent = '';

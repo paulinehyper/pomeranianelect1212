@@ -58,8 +58,8 @@ app.once('ready', async () => {
     // mail_settings 테이블이 비어있을 때만 기본값 삽입
     const count = db.prepare('SELECT COUNT(*) as cnt FROM mail_settings').get().cnt;
     if (count === 0) {
-      db.prepare('INSERT INTO mail_settings (mail_type, protocol, mail_id, mail_pw, mail_since) VALUES (?, ?, ?, ?, ?)')
-        .run('naver', 'imap-ssl', '', '', '');
+      db.prepare('INSERT INTO mail_settings (mail_type, protocol, mail_id, mail_pw, mail_since, mail_server) VALUES (?, ?, ?, ?, ?, ?)')
+        .run('naver', 'imap-ssl', '', '', '', '');
     }
   } catch (e) {
     // 무시
