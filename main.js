@@ -3,6 +3,12 @@ const { app, BrowserWindow, ipcMain, Tray, Menu } = require('electron');
 const path = require('path');
 const autoLauncher = require('./auto-launch');
 
+// 전체 할일 삭제
+ipcMain.handle('delete-all-todos', () => {
+  db.prepare('DELETE FROM todos').run();
+  return { success: true };
+});
+
 // 환경설정(app-settings.html) 창 열기
 let appSettingsWindow = null;
 ipcMain.on('open-app-settings', () => {
@@ -84,10 +90,11 @@ app.once('ready', async () => {
 // 할일 제외(숨김) 처리: todo_flag=0
 ipcMain.handle('exclude-todo', (event, id) => {
   db.prepare('UPDATE todos SET todo_flag=0 WHERE id=?').run(id);
-  // 학습데이터에서 해당 할일(메일 기반일 경우 subject+body 포함된 줄)도 삭제
+  // 학습데이터에서 해당 할일(메일 기반일 경우 subject+body 포함된 줄)도 삭제 및 negative 샘플로 저장
   try {
     // todos에서 unique_hash가 있으면 메일 기반임
     const todo = db.prepare('SELECT * FROM todos WHERE id=?').get(id);
+    let negativeSample = '';
     if (todo && todo.unique_hash) {
       // emails에서 subject/body 찾기
       const mail = db.prepare('SELECT subject, body FROM emails WHERE unique_hash=?').get(todo.unique_hash);
@@ -99,7 +106,16 @@ ipcMain.handle('exclude-todo', (event, id) => {
           return !(line.includes(mail.subject) || line.includes(mail.body));
         });
         fs.writeFileSync('todo_train_data.txt', filtered.join('\n'));
+        // negative 샘플로 저장 (예: __NEG__ [제목] [본문])
+        negativeSample = `__NEG__ ${mail.subject} ${mail.body || ''}`.trim();
       }
+    } else if (todo) {
+      // 일반 할일도 negative 샘플로 저장
+      negativeSample = `__NEG__ ${todo.task} ${todo.memo || ''}`.trim();
+    }
+    if (negativeSample) {
+      const fs = require('fs');
+      fs.appendFileSync('todo_train_data.txt', `\n${negativeSample}`);
     }
   } catch (e) { /* 무시 */ }
   return { success: true };
@@ -220,9 +236,9 @@ ipcMain.handle('get-mail-settings', () => {
 
 ipcMain.handle('set-email-todo-flag', (event, id, flag) => {
   db.prepare('UPDATE emails SET todo_flag = ? WHERE id = ?').run(flag, id);
+  const mail = db.prepare('SELECT subject, body, deadline, from_addr FROM emails WHERE id = ?').get(id);
   if (flag == 1) {
     // 메일 본문+제목을 positive(할일) 샘플로 저장 및 todos에 insert
-    const mail = db.prepare('SELECT subject, body, deadline, from_addr FROM emails WHERE id = ?').get(id);
     if (mail) {
       // 중복 방지: subject+body+from_addr+deadline 해시
       const crypto = require('crypto');
@@ -236,6 +252,11 @@ ipcMain.handle('set-email-todo-flag', (event, id, flag) => {
       const line = `1\t${(mail.subject || '').replace(/\t/g,' ')} ${(mail.body || '').replace(/\t/g,' ')}\n`;
       fs.appendFileSync('todo_train_data.txt', line);
     }
+  } else if (flag == 0 && mail) {
+    // unique_hash 계산 후 해당 메일 기반 todos 삭제
+    const crypto = require('crypto');
+    const hash = crypto.createHash('sha256').update((mail.subject||'')+(mail.body||'')+(mail.from_addr||'')+(mail.deadline||'')).digest('hex');
+    db.prepare('DELETE FROM todos WHERE unique_hash = ?').run(hash);
   }
   return { success: true };
 });

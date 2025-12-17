@@ -83,6 +83,14 @@ async function fetchTodos() {
 function renderList(todos) {
   const list = document.querySelector('.schedule-list');
   list.innerHTML = '';
+  if (!todos || todos.length === 0) {
+    const li = document.createElement('li');
+    li.textContent = '할일이 없습니다.';
+    li.style.color = '#888';
+    li.style.textAlign = 'center';
+    list.appendChild(li);
+    return;
+  }
   let dragSrcIdx = null;
   // 데드라인이 빠른 순서로 정렬 (없음/미설정은 맨 뒤)
   const sortedTodos = [...todos].sort((a, b) => {
@@ -277,7 +285,7 @@ setInterval(async () => {
   renderList(todos);
 }, 60 * 1000);
 
-// 새로고침 버튼 추가 및 동작 구현
+// 새로고침/전체삭제 버튼 추가 및 동작 구현
 const headerRight = document.querySelector('.header-right');
 const refreshBtn = document.createElement('button');
 refreshBtn.className = 'refresh-btn';
@@ -288,4 +296,18 @@ headerRight.insertBefore(refreshBtn, headerRight.firstChild);
 refreshBtn.addEventListener('click', async () => {
   const todos = await fetchTodos();
   renderList(todos);
+});
+
+const deleteAllBtn = document.createElement('button');
+deleteAllBtn.className = 'delete-all-btn';
+deleteAllBtn.title = '전체 할일 삭제';
+deleteAllBtn.style.marginRight = '8px';
+deleteAllBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="16" height="16" rx="3" fill="#ffe0e0" stroke="#e00" stroke-width="1.5"/><path d="M8 12h8" stroke="#e00" stroke-width="2"/></svg>`;
+headerRight.insertBefore(deleteAllBtn, headerRight.firstChild);
+deleteAllBtn.addEventListener('click', async () => {
+  if (confirm('정말 전체 할일을 삭제하시겠습니까?')) {
+    await window.electronAPI.deleteAllTodos();
+    const todos = await fetchTodos();
+    renderList(todos);
+  }
 });

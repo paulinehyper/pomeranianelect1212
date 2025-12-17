@@ -22,5 +22,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   insertTodo: (todo) => ipcRenderer.invoke('insert-todo', todo),
   openAppSettings: () => ipcRenderer.send('open-app-settings'),
   getAutoLaunch: () => ipcRenderer.invoke('get-auto-launch'),
-  setAutoLaunch: (enable) => ipcRenderer.invoke('set-auto-launch', enable)
+  setAutoLaunch: (enable) => ipcRenderer.invoke('set-auto-launch', enable),
+  deleteAllTodos: () => ipcRenderer.invoke('delete-all-todos')
 });

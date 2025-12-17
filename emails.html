@@ -35,7 +35,7 @@
           <th>수신일</th>
           <th>제목</th>
           <th>발신자</th>
-          <th>To-Do</th>
+          <th>To-Do <input type="checkbox" id="checkAllTodos" style="vertical-align:middle;" title="전체 선택/해제"></th>
         </tr>
       </thead>
       <tbody>
@@ -56,6 +56,16 @@
   </div>
   <script>
     function renderEmails(emails) {
+      // 전체선택 체크박스 상태 동기화 (모든 메일이 체크되어 있으면 전체선택도 체크)
+      setTimeout(() => {
+        const allCbs = document.querySelectorAll('#emailsTable tbody input[type="checkbox"]');
+        const checkAll = document.getElementById('checkAllTodos');
+        if (checkAll && allCbs.length) {
+          const checkedCount = Array.from(allCbs).filter(cb => cb.checked).length;
+          checkAll.checked = (checkedCount === allCbs.length);
+          checkAll.indeterminate = (checkedCount > 0 && checkedCount < allCbs.length);
+        }
+      }, 50);
       const tbody = document.getElementById('emailsTable').querySelector('tbody');
       tbody.innerHTML = '';
       emails.forEach(mail => {
@@ -134,6 +144,24 @@
           renderEmails(emails);
         });
       });
+      // 전체선택 체크박스 이벤트
+      const checkAll = document.getElementById('checkAllTodos');
+      if (checkAll) {
+        checkAll.onchange = async function() {
+          const allCbs = document.querySelectorAll('#emailsTable tbody input[type="checkbox"]');
+          for (const cb of allCbs) {
+            if (cb.checked !== checkAll.checked) {
+              cb.checked = checkAll.checked;
+              const id = cb.getAttribute('data-id');
+              const flag = cb.checked ? 1 : 0;
+              await window.electronAPI.setEmailTodoFlag(id, flag);
+            }
+          }
+          // 최신 목록 다시 렌더링
+          const emails = await window.electronAPI.getEmails();
+          renderEmails(emails);
+        };
+      }
       // 모달 닫기 버튼 이벤트
       document.getElementById('closeMailModal').onclick = function() {
         document.getElementById('mailModal').style.display = 'none';
