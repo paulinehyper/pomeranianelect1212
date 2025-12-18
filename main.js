@@ -3,6 +3,41 @@ const { app, BrowserWindow, ipcMain, Tray, Menu } = require('electron');
 const path = require('path');
 const autoLauncher = require('./auto-launch');
 
+
+// get-todos, get-emails 핸들러는 앱 시작 시 한 번만 등록
+ipcMain.handle('get-todos', () => {
+  // todo_flag=1(할일)만 조회
+  const todos = db.prepare('SELECT * FROM todos WHERE todo_flag=1 ORDER BY id').all();
+  const now = new Date();
+  return todos.map(todo => {
+    let deadline = todo.deadline;
+    let dday = '없음';
+    let date = '없음';
+    if (deadline) {
+      date = deadline.replace(/\//g, '/');
+      const deadlineDate = new Date(date);
+      if (!isNaN(deadlineDate)) {
+        const diff = Math.ceil((deadlineDate - now) / (1000*60*60*24));
+        dday = diff >= 0 ? `D-${diff}` : `D+${Math.abs(diff)}`;
+      }
+    }
+    return {
+      id: todo.id,
+      date,
+      dday,
+      task: todo.task,
+      deadline: deadline || '없음',
+      memo: todo.memo || '',
+      todo_flag: todo.todo_flag // 완료 여부 반환
+    };
+  });
+});
+
+ipcMain.handle('get-emails', () => {
+  const rows = db.prepare('SELECT * FROM emails ORDER BY id DESC').all();
+  return rows;
+});
+
 // 새로고침 시 이메일 todo를 todos에 추가
 ipcMain.handle('refresh-todos-from-emails', () => {
   try {
@@ -317,6 +352,9 @@ function createWindow() {
     }
   });
   mainWindow.loadFile('index.html');
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
 
   // 트레이 아이콘 클릭 시 창 토글
   if (tray) {
@@ -372,42 +410,11 @@ function createWindow() {
     return null;
   };
 
+
+
   ipcMain.on('open-settings', () => {
     if (settingsWindow && !settingsWindow.isDestroyed()) {
       settingsWindow.focus();
-      // get-todos, get-emails 핸들러는 앱 시작 시 한 번만 등록
-      ipcMain.handle('get-todos', () => {
-        // todo_flag=1(할일)만 조회
-        const todos = db.prepare('SELECT * FROM todos WHERE todo_flag=1 ORDER BY id').all();
-        const now = new Date();
-        return todos.map(todo => {
-          let deadline = todo.deadline;
-          let dday = '없음';
-          let date = '없음';
-          if (deadline) {
-            date = deadline.replace(/\//g, '/');
-            const deadlineDate = new Date(date);
-            if (!isNaN(deadlineDate)) {
-              const diff = Math.ceil((deadlineDate - now) / (1000*60*60*24));
-              dday = diff >= 0 ? `D-${diff}` : `D+${Math.abs(diff)}`;
-            }
-          }
-          return {
-            id: todo.id,
-            date,
-            dday,
-            task: todo.task,
-            deadline: deadline || '없음',
-            memo: todo.memo || '',
-            todo_flag: todo.todo_flag // 완료 여부 반환
-          };
-        });
-      });
-
-      ipcMain.handle('get-emails', () => {
-        const rows = db.prepare('SELECT * FROM emails ORDER BY id DESC').all();
-        return rows;
-      });
       return;
     }
       settingsWindow = new BrowserWindow({
