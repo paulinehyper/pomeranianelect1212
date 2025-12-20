@@ -1,35 +1,38 @@
 const { ipcMain } = require('electron');
 const Imap = require('imap-simple');
 const db = require('./db');
+const tfClassifier = require('./tf_todo_classifier');
 
-function getImapConfig({ mailType, protocol, mailId, mailPw, mail_server, mailServer, host }) {
+function getImapConfig(info) {
+  // DEBUG: info.mailSince 값 확인
+  console.log('[mail.js] mailConnect info.mailSince:', info.mailSince);
   let resolvedHost = '';
   let port, tls;
-  if (host && host.trim()) {
-    resolvedHost = host.trim();
-  } else if (mail_server && mail_server.trim()) {
-    resolvedHost = mail_server.trim();
-  } else if (mailServer && mailServer.trim()) {
-    resolvedHost = mailServer.trim();
+  if (info.host && info.host.trim()) {
+    resolvedHost = info.host.trim();
+  } else if (info.mail_server && info.mail_server.trim()) {
+    resolvedHost = info.mail_server.trim();
+  } else if (info.mailServer && info.mailServer.trim()) {
+    resolvedHost = info.mailServer.trim();
   } else {
     resolvedHost = '';
   }
   if (!resolvedHost) {
     throw new Error('IMAP 서버 주소(host)를 입력해야 합니다.');
   }
-  if (protocol === 'imap-ssl') {
+  if (info.protocol === 'imap-ssl' || info.protocol === 'imap-secure') {
     port = 993; tls = true;
-  } else if (protocol === 'imap') {
+  } else if (info.protocol === 'imap') {
     port = 143; tls = false;
-  } else if (protocol === 'pop3-ssl') {
+  } else if (info.protocol === 'pop3-ssl' || info.protocol === 'pop3-secure') {
     port = 995; tls = true;
-  } else if (protocol === 'pop3') {
+  } else if (info.protocol === 'pop3') {
     port = 110; tls = false;
   }
   return {
     imap: {
-      user: mailId,
-      password: mailPw,
+      user: info.mailId || info.mail_id,
+      password: info.mailPw || info.mail_pw,
       host: resolvedHost,
       port,
       tls,
@@ -42,29 +45,36 @@ function getImapConfig({ mailType, protocol, mailId, mailPw, mail_server, mailSe
 function setupMailIpc(main) {
   // 내부에서 직접 호출 가능한 syncMail 함수 export
   async function syncMail(info) {
-<<<<<<< HEAD
-=======
     // TensorFlow 모델 훈련 (앱 시작 시 1회만 하면 됨, 여기선 매번 호출)
     await tfClassifier.train();
     console.log('[syncMail] called with info:', info);
-    console.log('[syncMail] mailSince:', info.mailSince);
->>>>>>> 6452823 (mailSince fallback to created_at if unset, and keyword-based email todo classification)
     if (info.protocol.startsWith('imap')) {
       const config = getImapConfig(info);
+      console.log('[syncMail] IMAP config:', config);
       try {
         const conn = await Imap.connect(config);
+        console.log('[syncMail] IMAP connected');
         const box = await conn.openBox('INBOX');
+        console.log('[syncMail] INBOX opened');
         let searchCriteria = [];
-        if (info.mailSince) {
-          searchCriteria = [["SINCE", new Date(info.mailSince)]];
+        const mailSince = info.mailSince || info.mail_since;
+        if (mailSince && typeof mailSince === 'string' && mailSince.trim() !== '') {
+          const sinceDate = new Date(mailSince);
+          if (!isNaN(sinceDate.getTime())) {
+            searchCriteria = [["SINCE", sinceDate]];
+          } else {
+            searchCriteria = ["ALL"];
+          }
         } else {
           searchCriteria = ["ALL"];
         }
+        console.log('[syncMail] searchCriteria:', searchCriteria);
         const fetchOptions = {
           bodies: ["HEADER", "TEXT"],
           struct: true
         };
         const messages = await conn.search(searchCriteria, fetchOptions);
+        console.log(`[syncMail] messages found: ${messages.length}`);
         const { simpleParser } = require('mailparser');
         const crypto = require('crypto');
         const insert = db.prepare('INSERT INTO emails (received_at, subject, body, from_addr, todo_flag, unique_hash, deadline) VALUES (?, ?, ?, ?, ?, ?, ?)');
@@ -110,26 +120,54 @@ function setupMailIpc(main) {
               from = Array.isArray(headerPart.body.from) ? headerPart.body.from[0] : (headerPart.body.from || '');
               date = Array.isArray(headerPart.body.date) ? headerPart.body.date[0] : (headerPart.body.date || '');
             }
-            // 본문 파싱: 항상 simpleParser로 html/text 우선순위 저장
+            // 본문 파싱: quoted-printable 인코딩 자동 디코딩
             let body = '';
             if (textPart && textPart.body) {
               const { simpleParser } = require('mailparser');
+              const { htmlToText } = require('html-to-text');
+              const qp = require('quoted-printable');
+              const iconv = require('iconv-lite');
+              let rawBody = textPart.body;
+              // quoted-printable 디코딩 시도
+              if (typeof rawBody === 'string' && /=[0-9A-F]{2}/i.test(rawBody)) {
+                try {
+                  rawBody = qp.decode(rawBody);
+                  // charset 추출 시도 (헤더에서)
+                  let charset = 'utf-8';
+                  if (headerPart && headerPart.body && headerPart.body['content-type']) {
+                    const ct = Array.isArray(headerPart.body['content-type']) ? headerPart.body['content-type'][0] : headerPart.body['content-type'];
+                    const match = ct.match(/charset\s*=\s*"?([a-zA-Z0-9\-]+)"?/i);
+                    if (match && match[1]) charset = match[1].toLowerCase();
+                  }
+                  // iconv로 charset 변환
+                  rawBody = iconv.decode(Buffer.from(rawBody, 'binary'), charset);
+                } catch (e) { /* 무시 */ }
+              }
               try {
-                const parsed = await simpleParser(textPart.body);
+                const parsed = await simpleParser(rawBody);
                 if (parsed.html) {
-                  body = parsed.html;
+                  body = htmlToText(parsed.html, { wordwrap: false });
                 } else if (parsed.text) {
                   body = parsed.text;
                 } else {
-                  body = textPart.body.toString();
+                  body = rawBody.toString();
                 }
               } catch (e) {
-                body = textPart.body.toString();
+                body = rawBody.toString();
               }
             }
             const hash = crypto.createHash('sha256').update((subject||'')+(body||'')+(from||'')+(date||'')).digest('hex');
+            let todoFlag = null;
+            try {
+              // TensorFlow.js로 본문 분류
+              todoFlag = await tfClassifier.predictTodo(subject + ' ' + body);
+            } catch (e) {
+              todoFlag = null;
+            }
             if (!exists.get(hash).cnt) {
-              insert.run(date, subject, body, from, null, hash, extractDeadline(body));
+              const createdAt = info.mailSince || new Date().toISOString();
+              db.prepare('INSERT INTO emails (received_at, subject, body, from_addr, todo_flag, unique_hash, deadline, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+                .run(date, subject, body, from, todoFlag, hash, extractDeadline(body), createdAt);
             }
           } catch (e) { /* 무시 */ }
         }
@@ -275,7 +313,9 @@ function setupMailIpc(main) {
             console.log(`[IMAP] 메일: subject="${subject}", from="${from}", date="${isoDate || date}"`);
             if (exists.get(hash).cnt === 0) {
               try {
-                insert.run(isoDate || date, subject, body, from, todoFlag, hash, deadline);
+                const createdAt = info.mailSince || new Date().toISOString();
+                db.prepare('INSERT INTO emails (received_at, subject, body, from_addr, todo_flag, unique_hash, deadline, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+                  .run(isoDate || date, subject, body, from, todoFlag, hash, deadline, createdAt);
                 console.log(`[IMAP] DB 저장 성공: subject="${subject}"`);
               } catch (err) {
                 console.error(`[IMAP] DB 저장 실패: subject="${subject}", error=`, err);
@@ -413,7 +453,9 @@ function setupMailIpc(main) {
                 }
                 const deadline = extractDeadline(subject + ' ' + body);
                 if (exists.get(hash).cnt === 0) {
-                  insert.run(date, subject, body, from, todoFlag, hash, deadline);
+                  const createdAt = info.mailSince || new Date().toISOString();
+                  db.prepare('INSERT INTO emails (received_at, subject, body, from_addr, todo_flag, unique_hash, deadline, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+                    .run(date, subject, body, from, todoFlag, hash, deadline, createdAt);
                 }
               } catch (e) {}
               if (fetched === msgcount && !done) {
