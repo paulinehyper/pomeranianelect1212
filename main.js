@@ -1,12 +1,101 @@
-
+// 1분마다 emails 테이블에서 todo_flag=1인 메일을 todos 테이블에 실시간으로 추가
+setInterval(() => {
+  try {
+    const emails = db.prepare('SELECT * FROM emails WHERE todo_flag = 1').all();
+    for (const mail of emails) {
+      // unique_hash 생성
+      const crypto = require('crypto');
+      const hash = crypto.createHash('sha256').update((mail.subject||'')+(mail.body||'')+(mail.from_addr||'')+(mail.deadline||'')).digest('hex');
+      const exists = db.prepare('SELECT COUNT(*) as cnt FROM todos WHERE unique_hash = ?').get(hash);
+      if (exists.cnt === 0) {
+        const now = new Date();
+        const pad = n => n.toString().padStart(2, '0');
+        const dateStr = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+        db.prepare('INSERT INTO todos (date, dday, task, memo, deadline, todo_flag, unique_hash, mail_flag) VALUES (?, ?, ?, ?, ?, 1, ?, ?)')
+          .run(dateStr, '', mail.subject, mail.body || '', mail.deadline || '', hash, 'Y');
+      }
+    }
+  } catch (e) {
+    console.error('메일→할일 실시간 동기화 오류:', e);
+  }
+}, 60 * 1000);
 const { app, BrowserWindow, ipcMain, Tray, Menu } = require('electron');
 const path = require('path');
 const autoLauncher = require('./auto-launch');
+const db = require('./db');
+const { addTodosFromEmailTodos } = require('./email_todo_flag');
+
+// 이메일 id를 받아 해당 메일을 todo로 분류하는 IPC
+ipcMain.handle('add-todo-from-mail', (event, mailId) => {
+  try {
+    // 1. 해당 메일 unique_hash가 없으면 새로 생성
+    let mail = db.prepare('SELECT * FROM emails WHERE id=?').get(mailId);
+    if (!mail) return { success: false, error: '메일을 찾을 수 없음' };
+    if (!mail.unique_hash) {
+      const crypto = require('crypto');
+      mail.unique_hash = crypto.createHash('sha256').update((mail.subject||'')+(mail.body||'')+(mail.received_at||'')).digest('hex');
+      db.prepare('UPDATE emails SET unique_hash=? WHERE id=?').run(mail.unique_hash, mailId);
+    }
+    db.prepare('UPDATE emails SET todo_flag=1 WHERE id=?').run(mailId);
+    const exists = db.prepare('SELECT COUNT(*) as cnt FROM todos WHERE unique_hash = ? AND todo_flag = 1').get(mail.unique_hash).cnt;
+    if (exists === 0) {
+      const now = new Date();
+      const pad = n => n.toString().padStart(2, '0');
+      const dateStr = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+      db.prepare('INSERT INTO todos (date, dday, task, memo, deadline, todo_flag, unique_hash, mail_flag) VALUES (?, ?, ?, ?, ?, 1, ?, ?)')
+        .run(dateStr, '', mail.subject, mail.body || '', mail.deadline || '', mail.unique_hash, 'Y');
+    }
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+});
+
+// ...require 구문들...
+// ...existing code...
+
+// ...existing code...
+// ...existing code...
+// ...중복 require 제거, 아래에서 한 번만 선언...
+// ...중복 require 제거, 아래에서 한 번만 선언...
+// ...중복 require 제거, 아래에서 한 번만 선언...
+// 아래 require들은 Electron 객체 선언 이후에 위치해야 안전
+// ...중복 require 제거, 아래에서 한 번만 선언...
+// ...중복 require 제거, 아래에서 한 번만 선언...
+// ...중복 require 제거, 아래에서 한 번만 선언...
+// ...중복 require 제거, 아래에서 한 번만 선언...
+// ...중복 require 제거, 아래에서 한 번만 선언...
+// 아래 require들은 Electron 객체 선언 이후에 위치해야 안전
+// ...중복 require 제거, 아래에서 한 번만 선언...
+// ...중복 require 제거, 아래에서 한 번만 선언...
+
+// 메일 상세보기 창을 mainWindow 오른쪽에 띄우는 IPC 핸들러
+ipcMain.on('open-mail-detail', (event, params) => {
+  if (!mainWindow) return;
+  const bounds = mainWindow.getBounds();
+  const detailWindow = new BrowserWindow({
+    width: 700,
+    height: 600,
+    x: bounds.x + 10,
+    y: bounds.y,
+    frame: false,
+    resizable: true,
+    movable: true,
+    alwaysOnTop: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  });
+  detailWindow.loadURL(`file://${__dirname}/mail-detail.html?${params}`);
+  detailWindow.on('closed', () => {});
+});
 
 
 // get-todos, get-emails 핸들러는 앱 시작 시 한 번만 등록
 ipcMain.handle('get-todos', () => {
-  // todo_flag=1(할일)만 조회
+  // todo_flag=1(할일) 전체 반환
   const todos = db.prepare('SELECT * FROM todos WHERE todo_flag=1 ORDER BY id').all();
   const now = new Date();
   return todos.map(todo => {
@@ -62,8 +151,8 @@ ipcMain.on('open-app-settings', () => {
     return;
   }
   appSettingsWindow = new BrowserWindow({
-    width: 420,
-    height: 260,
+    width: 600,
+    height: 400,
     resizable: false,
     minimizable: false,
     maximizable: false,
@@ -80,9 +169,6 @@ ipcMain.on('open-app-settings', () => {
   appSettingsWindow.on('closed', () => { appSettingsWindow = null; });
 });
 
-// 자동실행 상태 조회/변경 IPC
-const db = require('./db');
-const { addTodosFromEmailTodos } = require('./email_todo_flag');
 ipcMain.handle('get-auto-launch', async () => {
   try {
     const row = db.prepare('SELECT enabled FROM autoplay WHERE id=1').get();
@@ -181,9 +267,20 @@ const winIcon = iconPath;
 // 사용자 직접 할일 추가
 ipcMain.handle('insert-todo', (event, { task, deadline, memo }) => {
   try {
-    // deadline이 없으면 null, memo는 빈 문자열 허용, todo_flag=1로 저장
-    db.prepare('INSERT INTO todos (date, dday, task, memo, deadline, todo_flag) VALUES (?, ?, ?, ?, ?, 1)')
-      .run(deadline || '', '', task, memo || '', deadline || '');
+    // date: 현재 날짜/시간, dday: 마감일 있으면 계산, 없으면 '없음'
+    const now = new Date();
+    const pad = n => n.toString().padStart(2, '0');
+    const dateStr = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    let dday = '없음';
+    if (deadline) {
+      const deadlineDate = new Date(deadline);
+      if (!isNaN(deadlineDate)) {
+        const diff = Math.ceil((deadlineDate - now) / (1000*60*60*24));
+        dday = diff >= 0 ? `D-${diff}` : `D+${Math.abs(diff)}`;
+      }
+    }
+    db.prepare('INSERT INTO todos (date, dday, task, memo, deadline, todo_flag, unique_hash) VALUES (?, ?, ?, ?, ?, 1, ?)')
+      .run(dateStr, dday, task, memo || '', deadline || '', null);
     return { success: true };
   } catch (err) {
     return { success: false, error: err.message };
@@ -228,6 +325,9 @@ ipcMain.on('open-keyword', () => {
 ipcMain.handle('insert-keyword', (event, keyword) => {
   try {
     db.insertKeyword(keyword);
+    // 키워드가 포함된 메일 제목을 todo_flag=1로 분류
+    const stmt = db.prepare('UPDATE emails SET todo_flag=1 WHERE subject LIKE ?');
+    stmt.run(`%${keyword}%`);
     return { success: true };
   } catch (err) {
     return { success: false, error: err.message };
@@ -273,15 +373,36 @@ ipcMain.handle('save-memo', (event, id, memo) => {
 });
 
 ipcMain.handle('save-mail-settings', (event, settings) => {
-  // Save mail_server and host as well
-  const stmt = db.prepare(`INSERT INTO mail_settings (mail_type, protocol, mail_id, mail_pw, mail_since, mail_server, host) VALUES (?, ?, ?, ?, ?, ?, ?)`);
-  stmt.run(settings.mailType, settings.protocol, settings.mailId, settings.mailPw, settings.mailSince, settings.mailServer, settings.host);
+  // mail_settings 테이블에 항상 1개만 저장 (id=1)
+  const stmt = db.prepare(`INSERT INTO mail_settings (id, protocol, mail_id, mail_pw, host, port, mail_since) VALUES (1, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET protocol=excluded.protocol, mail_id=excluded.mail_id, mail_pw=excluded.mail_pw, host=excluded.host, port=excluded.port, mail_since=excluded.mail_since`);
+  stmt.run(
+    settings.protocol || '',
+    settings.mailId || '',
+    settings.mailPw || '',
+    settings.host || '',
+    settings.port || '',
+    settings.mailSince || ''
+  );
+  // 저장 후 바로 메일 연동 실행
+  setTimeout(() => {
+    if (typeof syncMail === 'function') syncMail();
+  }, 100);
   return { success: true };
 });
 
 ipcMain.handle('get-mail-settings', () => {
-  const row = db.prepare('SELECT * FROM mail_settings ORDER BY id DESC LIMIT 1').get();
-  return row || null;
+  const row = db.prepare('SELECT * FROM mail_settings WHERE id=1').get();
+  if (!row) return null;
+  // key 변환: mail_id → mailId, mail_pw → mailPw, mail_since → mailSince
+  return {
+    protocol: row.protocol,
+    port: row.port,
+    host: row.host,
+    mailId: row.mail_id,
+    mailPw: row.mail_pw,
+    mailSince: row.mail_since
+  };
 });
 
 ipcMain.handle('set-email-todo-flag', (event, id, flag) => {
@@ -337,9 +458,9 @@ ipcMain.on('open-emails', () => {
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 600,
-    minWidth: 320,
-    height: 400,
+    width: 1500, // 기존 900에서 넓게 조정
+    minWidth: 1000, // 최소 넓이도 넓게 조정
+    height: 700,
     alwaysOnTop: true,
     frame: false,
     resizable: true,
@@ -351,7 +472,7 @@ function createWindow() {
       nodeIntegration: false
     }
   });
-  mainWindow.loadFile('index.html');
+  mainWindow.loadFile('main.html');
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
@@ -506,39 +627,24 @@ app.whenReady().then(() => {
   setupMailIpc();
 
   // 1분마다 환경설정의 메일 계정으로 메일 동기화
-  const { ipcMain } = require('electron');
   // const db = require('./db');
-  const { BrowserWindow } = require('electron');
+  // const { BrowserWindow } = require('electron');
   let syncMailInterval = null;
   const syncMail = async () => {
-<<<<<<< HEAD
-    const row = db.prepare('SELECT * FROM mail_settings ORDER BY id DESC LIMIT 1').get();
-    if (row && row.mail_id && row.mail_pw && row.protocol && row.mail_type) {
-      const mailModule = require('./mail');
-      if (typeof mailModule.syncMail === 'function') {
-        await mailModule.syncMail({ ...row, mail_server: row.mail_server });
-=======
     const row = db.prepare('SELECT * FROM mail_settings WHERE id=1').get();
     if (row && row.mail_id && row.mail_pw && row.protocol) {
       // mail_type이 없으면 기본값 'imap' 사용
       if (!row.mail_type) row.mail_type = 'imap';
-      // mailSince가 없으면 created_at을 mailSince로 사용
-      let mailSince = row.mail_since;
-      if (!mailSince && row.created_at) {
-        // created_at이 'YYYY-MM-DD HH:mm:ss' 형식일 수 있으므로 날짜만 추출
-        mailSince = row.created_at.split(' ')[0];
-      }
       const mailModule = require('./mail');
       if (typeof mailModule.syncMail === 'function') {
-        await mailModule.syncMail({ ...row, mail_server: row.mail_server, mailSince });
+        await mailModule.syncMail({ ...row, mail_server: row.mail_server });
         // 메일 연동 후 renderer에 동기화 완료 신호
         const win = BrowserWindow.getAllWindows()[0];
         if (win) win.webContents.send('mail-sync-complete');
->>>>>>> 6452823 (mailSince fallback to created_at if unset, and keyword-based email todo classification)
       } else {
         const win = BrowserWindow.getAllWindows()[0];
         if (win) {
-          win.webContents.send('mail-connect', { ...row, mail_server: row.mail_server, mailSince });
+          win.webContents.send('mail-connect', { ...row, mail_server: row.mail_server });
         }
       }
     }
