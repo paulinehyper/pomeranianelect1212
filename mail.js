@@ -42,6 +42,13 @@ function getImapConfig({ mailType, protocol, mailId, mailPw, mail_server, mailSe
 function setupMailIpc(main) {
   // 내부에서 직접 호출 가능한 syncMail 함수 export
   async function syncMail(info) {
+<<<<<<< HEAD
+=======
+    // TensorFlow 모델 훈련 (앱 시작 시 1회만 하면 됨, 여기선 매번 호출)
+    await tfClassifier.train();
+    console.log('[syncMail] called with info:', info);
+    console.log('[syncMail] mailSince:', info.mailSince);
+>>>>>>> 6452823 (mailSince fallback to created_at if unset, and keyword-based email todo classification)
     if (info.protocol.startsWith('imap')) {
       const config = getImapConfig(info);
       try {

@@ -511,15 +511,34 @@ app.whenReady().then(() => {
   const { BrowserWindow } = require('electron');
   let syncMailInterval = null;
   const syncMail = async () => {
+<<<<<<< HEAD
     const row = db.prepare('SELECT * FROM mail_settings ORDER BY id DESC LIMIT 1').get();
     if (row && row.mail_id && row.mail_pw && row.protocol && row.mail_type) {
       const mailModule = require('./mail');
       if (typeof mailModule.syncMail === 'function') {
         await mailModule.syncMail({ ...row, mail_server: row.mail_server });
+=======
+    const row = db.prepare('SELECT * FROM mail_settings WHERE id=1').get();
+    if (row && row.mail_id && row.mail_pw && row.protocol) {
+      // mail_type이 없으면 기본값 'imap' 사용
+      if (!row.mail_type) row.mail_type = 'imap';
+      // mailSince가 없으면 created_at을 mailSince로 사용
+      let mailSince = row.mail_since;
+      if (!mailSince && row.created_at) {
+        // created_at이 'YYYY-MM-DD HH:mm:ss' 형식일 수 있으므로 날짜만 추출
+        mailSince = row.created_at.split(' ')[0];
+      }
+      const mailModule = require('./mail');
+      if (typeof mailModule.syncMail === 'function') {
+        await mailModule.syncMail({ ...row, mail_server: row.mail_server, mailSince });
+        // 메일 연동 후 renderer에 동기화 완료 신호
+        const win = BrowserWindow.getAllWindows()[0];
+        if (win) win.webContents.send('mail-sync-complete');
+>>>>>>> 6452823 (mailSince fallback to created_at if unset, and keyword-based email todo classification)
       } else {
         const win = BrowserWindow.getAllWindows()[0];
         if (win) {
-          win.webContents.send('mail-connect', { ...row, mail_server: row.mail_server });
+          win.webContents.send('mail-connect', { ...row, mail_server: row.mail_server, mailSince });
         }
       }
     }

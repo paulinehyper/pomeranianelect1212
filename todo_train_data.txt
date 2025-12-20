@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 1	확인요망 취약점 진단 결과를 확인해주세요 2026년 1월 15일까지
 
 전자금융기반시설 조사 자료를 제출해주세요
@@ -53,7 +54,6 @@ Hyatt Regency
 ---------------------------------------------------------
   
             
-Accounting Clerk
 Four Seasons Hotel Seoul
 서울
 채용공고 보기: https://www.linkedin.com/comm/jobs/view/4342696863/?trackingId=2lEyXyNsQVKBn1eLGQfedw%3D%3D&refId=Ds71qYvFQv2Kh%2FlQVRgbww%3D%3D&lipi=urn%3Ali%3Apage%3Aemail_email_job_alert_digest_01%3BV%2B3iDGMWR4Czh%2Fxvn5lFkQ%3D%3D&midToken=AQESalmPFijyKw&midSig=3mUhKFzYLeZY01&trk=eml-email_job_alert_digest_01-job_card-0-view_job&trkEmail=eml-email_job_alert_digest_01-job_card-0-view_job-null-359j0k~mj0pv3rl~mn-null-null&eid=359j0k-mj0pv3rl-mn&otpToken=MTMwYzFlZTIxNjJmYzhjMWIyMjQwNGVkNDAxYmUzYjU4YmNlZDA0ODlhYWU4YTYxNzdjNzA3NmY0ZTViNWRmMGY3ZGY5N2UzNWJkOWUwZGM1MWE1ZDk1ODM2YzE5ZjRiNzY5YWVmNTcwNzA1M2ZlMzJhZDEsMSwx
@@ -18651,3 +18651,5 @@ __NEG__ (광고)[📢설문Event] 얼굴/홍채 인식, 여러분의 생각은 ?
   </tbody></table>
 </center>
 <img src='https://s002.sendmail05.com:443/detect/open?mailtype=email&campaignidx=4078&email=rhvhffls@naver.com&csvimportIdxForeign=68483&responseend=2025-12-24' width=0 height=0 onError='this.style.visibility=hidden'>
+=======
+>>>>>>> 6452823 (mailSince fallback to created_at if unset, and keyword-based email todo classification)

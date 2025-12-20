@@ -28,13 +28,13 @@ const REQUEST_PATTERNS = [
 function markTodoEmails() {
   const emails = db.prepare('SELECT id, subject, body FROM emails WHERE todo_flag = 0').all();
   const update = db.prepare('UPDATE emails SET todo_flag = 1 WHERE id = ?');
+  // DB에서 등록된 키워드 불러오기
+  const userKeywords = db.getAllKeywords().map(k => k.toLowerCase());
   for (const mail of emails) {
     const text = (mail.subject + ' ' + (mail.body || '')).toLowerCase();
-    // 키워드, 요청/요구 패턴, 기한/날짜 패턴이 하나라도 있으면 todo로 분류
-    const hasTodoKeyword = TODO_KEYWORDS.some(k => text.includes(k));
-    const hasRequestPattern = REQUEST_PATTERNS.some(re => re.test(text));
-    const hasDeadlinePattern = DEADLINE_PATTERNS.some(re => re.test(text));
-    if (hasTodoKeyword || hasRequestPattern || hasDeadlinePattern) {
+    // 등록된 키워드가 하나라도 포함되면 todo로 분류
+    const hasUserKeyword = userKeywords.some(k => k && text.includes(k));
+    if (hasUserKeyword) {
       update.run(mail.id);
     }
   }
